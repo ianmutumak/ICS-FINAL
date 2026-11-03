@@ -43,10 +43,6 @@ export const AdminConsoleView: React.FC = () => {
     addDepartment,
     updateDepartment,
     deleteDepartment,
-    templates,
-    addTemplate,
-    updateTemplate,
-    deleteTemplate,
     categories,
     addCategory,
     deleteCategory,
@@ -54,7 +50,7 @@ export const AdminConsoleView: React.FC = () => {
     setActiveTab,
   } = useHandover();
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'shifts' | 'incidents' | 'tasks' | 'overrides' | 'zones_templates'>('users');
+  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'shifts' | 'incidents' | 'tasks' | 'overrides' | 'zones'>('users');
 
   // Override dialog state
   const [selectedShiftToOverride, setSelectedShiftToOverride] = useState<string | null>(null);
@@ -79,17 +75,6 @@ export const AdminConsoleView: React.FC = () => {
   const [deptFloor, setDeptFloor] = useState('Zone Bay 01-08');
   const [deptCapacity, setDeptCapacity] = useState('1200');
   const [deptSupervisor, setDeptSupervisor] = useState(currentUser.name);
-
-  // Dynamic SBAR Template form state
-  const [showNewTmplModal, setShowNewTmplModal] = useState(false);
-  const [tmplName, setTmplName] = useState('');
-  const [tmplCategory, setTmplCategory] = useState(categories[0] || 'MHE & Heavy Machinery');
-  const [tmplSituation, setTmplSituation] = useState('');
-  const [tmplBackground, setTmplBackground] = useState('');
-  const [tmplAssessment, setTmplAssessment] = useState('');
-  const [tmplRecommendation, setTmplRecommendation] = useState('');
-  const [tmplHazard, setTmplHazard] = useState('');
-  const [tmplMetrics, setTmplMetrics] = useState('');
 
   // Category state
   const [newCategoryInput, setNewCategoryInput] = useState('');
@@ -160,28 +145,6 @@ export const AdminConsoleView: React.FC = () => {
     setShowNewDeptModal(false);
   };
 
-  const handleCreateTemplate = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tmplName.trim() || !tmplSituation.trim() || !tmplRecommendation.trim()) return;
-    addTemplate({
-      name: tmplName.trim(),
-      category: tmplCategory.trim() || 'Warehouse Operations',
-      defaultSituation: tmplSituation.trim(),
-      defaultBackground: tmplBackground.trim() || 'Standard operational conditions.',
-      defaultAssessment: tmplAssessment.trim(),
-      defaultRecommendation: tmplRecommendation.trim(),
-      defaultHazardAlert: tmplHazard.trim() || undefined,
-      defaultMetrics: tmplMetrics.trim() || undefined,
-    });
-    setTmplName('');
-    setTmplSituation('');
-    setTmplBackground('');
-    setTmplAssessment('');
-    setTmplRecommendation('');
-    setTmplHazard('');
-    setTmplMetrics('');
-    setShowNewTmplModal(false);
-  };
 
   const handleAddCategorySubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,15 +223,15 @@ export const AdminConsoleView: React.FC = () => {
             User & Role Management ({staffList.length})
           </button>
           <button
-            onClick={() => setActiveAdminTab('zones_templates')}
+            onClick={() => setActiveAdminTab('zones')}
             className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeAdminTab === 'zones_templates'
+              activeAdminTab === 'zones'
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-bold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
             <Layers className="w-3.5 h-3.5 text-teal-600" />
-            <span>Facility Zones & SBAR Templates ({departments.length}/{templates.length})</span>
+            <span>Facility Operational Zones & Classifications ({departments.length})</span>
           </button>
           <button
             onClick={() => setActiveAdminTab('shifts')}
@@ -414,18 +377,18 @@ export const AdminConsoleView: React.FC = () => {
         </div>
       )}
 
-      {/* Tab: Facility Zones & SBAR Templates Management */}
-      {activeAdminTab === 'zones_templates' && (
+      {/* Tab: Facility Zones & Classifications Management */}
+      {activeAdminTab === 'zones' && (
         <div className="space-y-6">
           {/* Sub-header Banner */}
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <Layers className="w-5 h-5 text-teal-600 dark:text-teal-400" />
-                Dynamic Facility Zones & SBAR Templates Hub
+                Dynamic Facility Operational Zones & Classifications
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-2xl leading-relaxed">
-                Configure facility zones, dock bays, handover templates, and workstream categories. All values dynamically populate operator menus, shift creation, and SBAR logging across the platform.
+                Configure facility operational zones, cargo bays, storage aisles, and workstream classifications. All values dynamically populate operator menus and shift creation across the platform.
               </p>
             </div>
             <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
@@ -435,13 +398,6 @@ export const AdminConsoleView: React.FC = () => {
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Facility Zone</span>
-              </button>
-              <button
-                onClick={() => setShowNewTmplModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add SBAR Template</span>
               </button>
             </div>
           </div>
@@ -517,78 +473,6 @@ export const AdminConsoleView: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 2: SBAR Operational Templates Cards */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <ClipboardList className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                  Operational SBAR Templates ({templates.length})
-                </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Pre-configured turnover incident and equipment templates used by operators when logging handover records
-                </p>
-              </div>
-              <button
-                onClick={() => setShowNewTmplModal(true)}
-                className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded-lg cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>New Template</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {templates.map((tmpl) => (
-                <div
-                  key={tmpl.id}
-                  className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3 relative group"
-                >
-                  <div className="flex items-start justify-between gap-2 pb-2 border-b border-slate-200 dark:border-slate-700/60">
-                    <div>
-                      <h5 className="font-bold text-slate-900 dark:text-white text-xs">
-                        {tmpl.name}
-                      </h5>
-                      <span className="text-[10px] font-mono uppercase text-teal-700 dark:text-teal-400 font-semibold">
-                        {tmpl.category}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => deleteTemplate(tmpl.id)}
-                      title="Delete template"
-                      className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-1.5 text-xs">
-                    <div>
-                      <strong className="text-teal-700 dark:text-teal-400 text-[11px]">S:</strong>{' '}
-                      <span className="text-slate-600 dark:text-slate-300 text-[11px]">{tmpl.defaultSituation}</span>
-                    </div>
-                    <div>
-                      <strong className="text-slate-700 dark:text-slate-300 text-[11px]">B:</strong>{' '}
-                      <span className="text-slate-500 dark:text-slate-400 text-[11px]">{tmpl.defaultBackground}</span>
-                    </div>
-                    <div>
-                      <strong className="text-slate-700 dark:text-slate-300 text-[11px]">A:</strong>{' '}
-                      <span className="text-slate-600 dark:text-slate-300 text-[11px]">{tmpl.defaultAssessment}</span>
-                    </div>
-                    <div>
-                      <strong className="text-teal-700 dark:text-teal-400 text-[11px]">R:</strong>{' '}
-                      <span className="text-slate-800 dark:text-slate-200 font-medium text-[11px]">{tmpl.defaultRecommendation}</span>
-                    </div>
-                    {tmpl.defaultHazardAlert && (
-                      <div className="text-[10px] text-amber-700 dark:text-amber-400 font-mono bg-amber-50 dark:bg-amber-950/40 p-1 rounded">
-                        Special Order / LOTO: {tmpl.defaultHazardAlert}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Section 3: Workstream Classifications / Categories */}
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
@@ -1194,155 +1078,7 @@ export const AdminConsoleView: React.FC = () => {
         </div>
       )}
 
-      {/* Modal: Create SBAR Template */}
-      {showNewTmplModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white dark:bg-slate-900 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                Create Operational SBAR Template
-              </h3>
-              <button
-                onClick={() => setShowNewTmplModal(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-              >
-                <XCircle className="w-4 h-4" />
-              </button>
-            </div>
 
-            <form onSubmit={handleCreateTemplate} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Template Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Hazardous Liquid Containment Protocol"
-                  value={tmplName}
-                  onChange={(e) => setTmplName(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Workstream Classification / Category *
-                </label>
-                <select
-                  value={tmplCategory}
-                  onChange={(e) => setTmplCategory(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
-                >
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Default Situation (S) *
-                </label>
-                <textarea
-                  rows={2}
-                  required
-                  placeholder="Brief acute state of the event or asset..."
-                  value={tmplSituation}
-                  onChange={(e) => setTmplSituation(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Default Background (B)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Operational context, service hours, previous state..."
-                  value={tmplBackground}
-                  onChange={(e) => setTmplBackground(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Default Assessment (A)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Objective findings, telemetry, visual examination..."
-                  value={tmplAssessment}
-                  onChange={(e) => setTmplAssessment(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Default Recommendation (R) *
-                </label>
-                <textarea
-                  rows={2}
-                  required
-                  placeholder="Direct orders for the incoming shift team..."
-                  value={tmplRecommendation}
-                  onChange={(e) => setTmplRecommendation(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Special LOTO / Hazard Alert
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. LOTO Tag #881 on unit"
-                    value={tmplHazard}
-                    onChange={(e) => setTmplHazard(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono text-[11px]"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Default Telemetry Metrics
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Pressure: 175 bar, Temp: 21°C"
-                    value={tmplMetrics}
-                    onChange={(e) => setTmplMetrics(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono text-[11px]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowNewTmplModal(false)}
-                  className="px-3 py-1.5 text-slate-500 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded-lg cursor-pointer"
-                >
-                  Save SBAR Template
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

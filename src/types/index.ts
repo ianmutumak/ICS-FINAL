@@ -11,17 +11,6 @@ export type ShiftType = 'morning' | 'evening' | 'night';
 
 export type ShiftStatus = 'scheduled' | 'in_progress' | 'pending_signoff' | 'completed' | 'archived';
 
-export interface OperationalTemplate {
-  id: string;
-  name: string;
-  category: string;
-  defaultSituation: string;
-  defaultBackground: string;
-  defaultAssessment: string;
-  defaultRecommendation: string;
-  defaultHazardAlert?: string;
-  defaultMetrics?: string;
-}
 
 export interface UserStaff {
   id: string;
@@ -197,9 +186,48 @@ export interface SignoffComplianceRecord {
   timeDeltaMinutes: number;
 }
 
+export interface SusEvaluationRecord {
+  id: string;
+  shiftId?: string;
+  shiftCode?: string;
+  departmentName?: string;
+  supervisorName: string;
+  supervisorRole: string;
+  timestamp: string;
+  scores: number[]; // 10 items (1-5)
+  totalScore: number; // 0-100 according to Brooke (1996)
+  grade: 'A' | 'B' | 'C' | 'D' | 'F';
+  adjectiveRating: 'Best Imaginable' | 'Excellent' | 'Good' | 'OK' | 'Poor';
+  percentileBenchmark: number;
+  debriefNotes?: string;
+  operationalBottlenecks?: string;
+  signoffVerificationFeedback?: string;
+}
+
+export interface HandoverEffectivenessIndex {
+  score: number; // 0 - 100
+  rating: 'Optimal' | 'Satisfactory' | 'At-Risk' | 'Deficient';
+  breakdown: {
+    sbarCompleteness: number; // max 40
+    safetyAck: number; // max 35
+    equipmentCustody: number; // max 25
+    penalties: number; // deductions
+  };
+  details: {
+    totalCases: number;
+    completedSbarCases: number;
+    criticalAlertsTotal: number;
+    criticalAlertsAcknowledged: number;
+    equipmentTotal: number;
+    equipmentChecked: number;
+    dualSignoffReady: boolean;
+  };
+}
+
 export interface AppThemeConfig {
   fontDisplay: 'Plus Jakarta Sans' | 'Outfit' | 'Manrope' | 'Syne';
   colorTheme: 'clinical-teal' | 'circadian-night' | 'industrial-slate' | 'emergency-coral';
   sector: SectorType;
   isDark: boolean;
 }
+

@@ -13,23 +13,24 @@ export async function loginWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (error) {
-    console.warn('Firebase Google Sign-In popup notice:', error);
+    console.warn('Firebase Google Sign-In notice:', error);
     throw error;
   }
 }
 
 export async function logoutFirebase() {
-  await signOut(auth);
+  try {
+    await signOut(auth);
+  } catch (err) {
+    console.warn('Firebase SignOut notice:', err);
+  }
 }
 
-// Test connectivity on initialization
+// Resilient connectivity verification
 (async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    // Ignore offline client notices during local preview
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.info('Firestore initialized.');
-    }
+  } catch {
+    // Offline resilience: allow local fallback without throwing unhandled exceptions
   }
 })();

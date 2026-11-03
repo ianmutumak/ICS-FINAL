@@ -1,32 +1,99 @@
-# ZAMU-CHECK: Bonded Freight & Enterprise Shift Turnover System
+# ZAMU-CHECK: Standardized Shift Handover Management Architecture
+**Project**: Strathmore University ICS Capstone (Kiome Ian Mutuma · 144861 · Supervisor: Dr. Esther Khakata)  
+**Domain Scope**: Enterprise Warehouse & Logistics (Kenya Airways Bonded Freight Hub & General Industrial Facilities)
 
-## Implementation Status: COMPLETED
+---
 
-All legacy clinical and medical instances have been completely purged from the codebase, and the platform has been fully transitioned to a formal, professional warehouse and air freight shift handover system tailored for **Kenya Airways Cargo (Import and Export Bonded Freight Warehouse)** while preserving versatile flexibility for general industrial warehouses.
+## Executive Summary & Objectives
+Based on the full capstone engineering documentation and your clarifying choices:
+1. **Primary Workflow**: A **Unified Suite** integrating real-time **SBAR / ISOBAR** structured logging, **Dual Sign-Off** non-repudiation verification, and live **Handover Effectiveness Index (HEI)** telemetry in one responsive operational screen.
+2. **Evaluation & Usability**: An **Embedded Supervisor Post-Handover Debrief & 10-Item SUS (System Usability Scale)** survey tab directly within the analytics governance module to compute standard percentile scores, grade scales (A–F), and track cognitive load reduction over successive shifts.
+3. **Custody & Equipment Agility**: **User-Defined Custom Categories & Dynamic Tracking**—eliminating rigid hardcoded presets while providing smooth, flexible warehouse tracking (dock doors, forklifts, reach trucks, customs cages, cold bays, or custom industrial equipment) populated directly through user input and persistent database storage.
 
-***
+```
++---------------------------------------------------------------------------------------------------+
+|                                  ZAMU-CHECK OPERATIONAL ARCHITECTURE                              |
++---------------------------------------------------------------------------------------------------+
+|  1. AUTH GATEWAY & ROLES       2. UNIFIED SBAR SUITE           3. VERIFICATION & AUDIT            |
+|  - Shift Operator              - Asynchronous ISOBAR Logging   - Mandatory High-Risk Ack          |
+|  - Reviewing Supervisor        - Dynamic Custom Categories     - Dual Cryptographic Signatures    |
+|  - System Administrator        - Live HEI Telemetry Gauge      - Immutable Audit Trail Ledger     |
++---------------------------------------------------------------------------------------------------+
+|  4. ANALYTICS & USABILITY RESEARCH MODULE (Strathmore Capstone Chapter 3)                         |
+|  - Handover Effectiveness Index (HEI) [Completeness, Acknowledged Safety Alerts, Custody Checks]  |
+|  - Mean Time to Report (MTTR) & Shift Transition Cycle Times                                      |
+|  - Standardized 10-Item System Usability Scale (SUS) Supervisor Debrief Tab (Brooke 1996)        |
++---------------------------------------------------------------------------------------------------+
+```
 
-### Summary of Completed Changes
+---
 
-1. **Purged Legacy Browser Caches & Storage Version Upgrade (`HandoverContext.tsx`)**:
-   - Upgraded all storage keys from `_v4` to `_v5` (`zamu_departments_v5`, `zamu_active_shift_v5`, `zamu_tasks_v5`, `zamu_staff_list_v5`, `zamu_templates_v5`, `zamu_categories_v5`, `zamu_incidents_v5`).
-   - Implemented an automatic cleanup routine in `HandoverProvider` that sweeps and deletes any stale legacy `_v1`, `_v2`, `_v3`, and `_v4` keys from `window.localStorage` upon application mount. Stale clinical tasks ("repeat ABG", "serum electrolytes", "acute ward 4B", "ICU", "bed") will never reappear.
+## User Review Required
 
-2. **Kenya Airways Freight Facility Operating Zones (`seedData.ts`, `types/index.ts`)**:
-   - `KQ-IMP`: **KQ Import Bonded Freight Warehouse** (JKIA Cargo Village Terminal 1, Bays 01-16 & Customs Bond Zone, capacity 2,500 pallets/units).
-   - `KQ-EXP`: **KQ Export Cargo & ULD Build-Up Facility** (JKIA Airside Logistics Hub, Pallet Dollies & Weighing Station 4).
-   - `KQ-COLD`: **Perishables & Pharma Cold Vault** (Perishables Center JKIA, Vaults +2°C to +8°C).
-   - `KQ-HAZ`: **Dangerous Goods (DGR) Storage Bay** (Airside Hazardous Bunker, Class 1-9 Secure Bunker Area).
-   - `KQ-XDK`: **Transit & Air-to-Air Cross-Dock Hub** (Central Transfer Terminal, Airside Transfer Conveyor Matrix).
+> [!NOTE]
+> Please review the architecture and components outlined below before we proceed to implementation.
 
-3. **Clean Air Freight & Warehouse Action Tasks**:
-   - Replaced all legacy tasks with active bonded warehouse operations: KRA customs release seals, pre-flight thermal logger export checks, heavy reach truck battery swaps, ULD PMC tie-down net inspections, Dubai transshipment piece count reconciliations, and high-loader calibrations.
+1. **HEI (Handover Effectiveness Index) Formula Weighting**:
+   - `HEI = (W_sbar * CompletenessScore) + (W_haz * HazardMitigationScore) + (W_eq * CustodyCheckScore) - Penalty(UnacknowledgedItems)`
+   - Default weights: 40% SBAR documentation completeness, 35% hazard/critical alert acknowledgment, 25% equipment custody reconciliation.
+2. **SUS (System Usability Scale) Standard Questionnaire**:
+   - The 10 standardized items from Brooke (1996) will be embedded in a dedicated **Supervisor Debrief & SUS** tab under Analytics, calculating scores from 0–100 with qualitative benchmark grade (A: ≥80.3, B: 68–80.2, C: 51–67.9, F: <51).
 
-4. **Strict Enterprise Posture & Eradication of Presentational Helper Copy**:
-   - Removed tutorial and presentational text across views (including explanations of active tasks, SBAR subtitle helper blurbs, and marketing copy).
-   - Cleaned the application footer (`App.tsx`) to a concise corporate status mark: `Kenya Airways Cargo & Freight Hub · Shift Turnover System · Non-Repudiation SBAR Protocol Ledger`.
-   - Updated analytics, attendance logs, and audit ledgers to strictly report cycle times, on-duty headcount, and cryptographic verification hashes without conversational clutter.
+---
 
-5. **Aviation & Industrial Theme Studio (`PersonalizationDrawer.tsx`)**:
-   - Replaced clinical theme options with **Aero Jade & Slate**, **HAZMAT & Safety Alert**, and **Industrial Steel & Cobalt**.
-   - Sector presets updated to **Kenya Airways Cargo & Bonded Freight**, **General Warehouse & Distribution**, and **Industrial On-Site & Plant Operations**.
+## Proposed Changes
+
+### Module 1: Core Types & State Management (`/src/types/index.ts`, `/src/context/HandoverContext.tsx`)
+- **Extend Data Models**:
+  - Add `HandoverEffectivenessIndex` model (`overallScore`, `sbarCompleteness`, `safetyAckRate`, `equipmentReconciliationRate`, `unresolvedRiskCount`).
+  - Add `SusEvaluationRecord` model (`id`, `handoverId`, `evaluatorId`, `evaluatorName`, `shiftCode`, `scores: [10 items]`, `calculatedScore`, `grade`, `debriefNotes`, `timestamp`).
+  - Add `CustomCategory` model allowing operators and supervisors to add, edit, and delete custom warehouse zones and equipment categories on the fly.
+- **Dynamic Category & Equipment Management**:
+  - Replace rigid airport presets with a flexible category manager that initializes clean defaults (e.g., Inbound Receiving, Staging Dock, Material Handling, Cold Storage, Bonded Secure Bay, Dispatch) while allowing users to create custom categories with tailored attributes.
+- **Persistence & Offline Buffering**:
+  - Store active shifts, custom categories, SUS evaluations, and SBAR cases in Firestore (`ai-studio-zamucheckshiftha-fd6e22d5-fc4f-4b5e-9a8b-3c9a20164f55`) with resilient localStorage caching.
+
+### Module 2: Unified SBAR & Active Handover Suite (`/src/components/dashboard/ActiveHandoverView.tsx`)
+- **Real-Time SBAR / ISOBAR Entry**:
+  - Structured cards for **Situation**, **Background**, **Assessment**, and **Recommendation** with severity badges (Critical, Unstable, Observation, Stable).
+  - High-risk / safety alerts toggle with mandatory acknowledgment status.
+- **Live HEI Telemetry Gauge**:
+  - Sticky/header telemetry widget displaying the live HEI score (0–100%) in real time as operators log items and perform custody checks.
+  - Color-coded indicator: Optimal (≥85%), Moderate (65–84%), Incomplete (<65%).
+- **Dynamic Equipment & Custody Reconciliation**:
+  - Interactive status controls (Functional, Inspection Due, Faulty, In Use).
+  - Custody handoff toggle with timestamped sign-off.
+  - "Add Custom Asset / Category" quick-action modal allowing ad-hoc asset entry without templates.
+
+### Module 3: Dual Digital Signature & Verification (`/src/components/modals/SignoffModal.tsx`)
+- **Two-Party Verification Protocol**:
+  - Outgoing operator formal declaration and digital PIN / signature.
+  - Incoming operator acknowledgment of all critical alerts, open carry-over tasks, and equipment custody tags.
+  - Cryptographic hash generation (`SHA-256` simulation based on payload, timestamp, and keys) for non-repudiation.
+- **Safety Gate**:
+  - Blocks handover finalization if unacknowledged critical/safety hazard items remain unresolved without explicit supervisor override.
+
+### Module 4: Embedded Supervisor Debrief & 10-Item SUS Evaluation (`/src/components/analytics/StatisticsAnalyticsView.tsx`)
+- **New Subtab: "Supervisor Debrief & SUS Survey"**:
+  - Embedded 10-item System Usability Scale questionnaire with 5-point Likert scale buttons (Strongly Disagree `1` to Strongly Agree `5`).
+  - Real-time score calculator using the formal SUS algorithm:
+    - Odd items: $X_i = \text{Score}_i - 1$
+    - Even items: $Y_i = 5 - \text{Score}_i$
+    - Total SUS Score: $(\sum X + \sum Y) \times 2.5$
+  - Visual gauge with percentile benchmarking (Sauro & Lewis standard) and academic grade assignment (A+ to F).
+  - Qualitative supervisor debrief notes field with Shift ID tag.
+  - Historical table of completed SUS evaluations with exportable summary for capstone dissertation defense.
+
+---
+
+## Verification Plan
+
+### Automated Checks
+- Run `compile_applet` to ensure zero TypeScript errors or missing imports.
+- Validate React component tree rendering without console exceptions.
+
+### Functional Testing Scenarios
+1. **Dynamic Category Creation**: Create a new custom warehouse category (e.g. "Automated Sortation Hub"), add custom equipment, and verify instant persistence.
+2. **SBAR Logging & Live HEI**: Create an SBAR case with a critical hazard alert; verify that the HEI score adjusts dynamically.
+3. **Dual Sign-off Flow**: Initiate handover signoff, acknowledge critical alerts as incoming operator, sign with cryptographic hash, and verify transition to the Archive ledger.
+4. **SUS Evaluation**: Fill out the 10-item SUS questionnaire as supervisor, verify mathematical scoring accuracy, and confirm the evaluation saves to the debrief log.
