@@ -7,8 +7,9 @@ import {
   ShiftActionItem,
   IncidentRecord,
   AdminOverrideLog,
-  OperationalTemplate,
+  SusEvaluationRecord,
 } from '../types';
+
 
 export const SEED_STAFF: UserStaff[] = [
   {
@@ -706,69 +707,77 @@ export const SEED_COMPLIANCE_RECORDS: SignoffComplianceRecord[] = [
 ];
 
 export const SEED_CATEGORIES: string[] = [
-  'Air Cargo & ULD Staging',
-  'MHE & Heavy Machinery',
-  'Cold-Chain & Perishables',
-  'Customs & KRA Bonded Clearance',
-  'Dangerous Goods (DGR)',
-  'Flight Dispatch & Marshalling',
+  'Inbound Staging & Receiving',
+  'MHE & Equipment Custody',
+  'Cold Storage & Temperature Vault',
+  'Customs & Bonded Freight',
+  'Hazardous & Dangerous Goods',
+  'Outbound Marshalling & Dispatch',
   'Facility Safety & Environmental',
 ];
 
-export const SEED_TEMPLATES: OperationalTemplate[] = [
+export const SEED_SUS_EVALUATIONS: SusEvaluationRecord[] = [
   {
-    id: 'tmpl-01',
-    name: 'ULD Damage & Aircraft Pallet Tie-Down Protocol',
-    category: 'Air Cargo & ULD Staging',
-    defaultSituation: 'PMC air cargo pallet flagged for irregular tie-down net tension and strap abrasion at corner ring 3.',
-    defaultBackground: 'Consolidated export air freight assembled for flight KQ102 to London Heathrow; gross weight 1,840 kg.',
-    defaultAssessment: 'Pallet base structural extrusion verified intact. Net strap replacement required before ramp dolly transfer.',
-    defaultRecommendation: 'Lead Cargo Marshall to install replacement IATA net and execute dual lock pin inspection prior to aircraft departure.',
-    defaultHazardAlert: 'Flight Safety Alert: Pallet must not be loaded onto high-loader until re-certified.',
-    defaultMetrics: 'Gross Weight: 1,840 kg, Tie-Down Points: 14/14, Contour: Maindeck Verified',
+    id: 'sus-01',
+    shiftId: 'hnd-active-01',
+    shiftCode: 'KQ-2026-NIGHT-01',
+    departmentName: 'KQ Import Bonded Freight Warehouse',
+    supervisorName: 'Mary Wanjiku',
+    supervisorRole: 'Shift Operations Supervisor',
+    timestamp: '2026-11-02 07:15 EAT',
+    // 10 items (1-5):
+    // Q1=5, Q2=1, Q3=5, Q4=2, Q5=5, Q6=1, Q7=4, Q8=1, Q9=5, Q10=1
+    // Odd: (5-1)=4, (5-1)=4, (5-1)=4, (4-1)=3, (5-1)=4 => sum=19
+    // Even: (5-1)=4, (5-2)=3, (5-1)=4, (5-1)=4, (5-1)=4 => sum=19
+    // Total converted = 38 * 2.5 = 95.0
+    scores: [5, 1, 5, 2, 5, 1, 4, 1, 5, 1],
+    totalScore: 95.0,
+    grade: 'A',
+    adjectiveRating: 'Best Imaginable',
+    percentileBenchmark: 98,
+    debriefNotes: 'Dual cryptographic sign-off eliminated the 20-minute verbal debrief lag. Acuity flags clearly communicated cold-chain pharma priorities.',
+    operationalBottlenecks: 'Physical walk-through for forklift battery checks was accelerated by 12 minutes.',
+    signoffVerificationFeedback: 'Hash verification gave full confidence to incoming crew.'
   },
   {
-    id: 'tmpl-02',
-    name: 'Cold-Chain Air Cargo Thermal Excursion',
-    category: 'Cold-Chain & Perishables',
-    defaultSituation: 'Cold-storage chamber logged transient thermal excursion sensor trigger above target specification.',
-    defaultBackground: 'High-value temperature-sensitive biologics awaiting morning customs clearance and aircraft loading.',
-    defaultAssessment: 'Core product internal datalogger inspected: Product temperature remained safe within validated spec. Ambient temperature restored.',
-    defaultRecommendation: 'Download CSV datalogger telemetry at 08:00 AM and submit to Airline Cargo QA. Maintain orange tamper quarantine seal.',
-    defaultHazardAlert: 'Quality Quarantine: Orange physical tamper seal applied to consignment pallet.',
-    defaultMetrics: 'Core Temp: +3.8 °C (Safe), Ambient Temp: +2.4 °C (Stable), Sensor ID: TL-SENS-094',
+    id: 'sus-02',
+    shiftId: 'hnd-prev-01',
+    shiftCode: 'KQ-2026-DAY-03',
+    departmentName: 'Perishables & Pharma Cold Vault',
+    supervisorName: 'Faith Atieno',
+    supervisorRole: 'Cold Vault Lead Officer',
+    timestamp: '2026-11-01 19:30 EAT',
+    // Q1=4, Q2=2, Q3=4, Q4=2, Q5=4, Q6=2, Q7=4, Q8=2, Q9=4, Q10=2
+    // Odd: 3+3+3+3+3=15; Even: 3+3+3+3+3=15; sum=30 * 2.5 = 75.0
+    scores: [4, 2, 4, 2, 4, 2, 4, 2, 4, 2],
+    totalScore: 75.0,
+    grade: 'B',
+    adjectiveRating: 'Good',
+    percentileBenchmark: 73,
+    debriefNotes: 'SBAR structure made documenting temperature alarms much faster than handwritten clipboard logs.',
+    operationalBottlenecks: 'Need custom categories for dry ice container checks.',
+    signoffVerificationFeedback: 'Dual sign-off was straightforward and completed within 5 minutes.'
   },
   {
-    id: 'tmpl-03',
-    name: 'MHE Mechanical Failure & LOTO Protocol',
-    category: 'MHE & Heavy Machinery',
-    defaultSituation: 'Reach Truck unit developed hydraulic mast drift and low pressure warning; vehicle parked safely.',
-    defaultBackground: 'Operating under standard high-bay load cycle; 1,420 service hours; 250-hour preventative maintenance pending.',
-    defaultAssessment: 'Micro-leak on secondary lift cylinder seal. LOTO padlock applied to battery disconnect switch (Tag #LOTO-881).',
-    defaultRecommendation: 'OEM certified technician booked for 08:30 AM arrival. Day shift must redistribute Bay 4 heavy putaways.',
-    defaultHazardAlert: 'Lockout/Tagout active: Tag #LOTO-881 on ignition battery disconnect switch.',
-    defaultMetrics: 'Hydraulic Pressure: 142 bar (Min 180), Mast Drift Rate: 4.5 cm/min, Battery Charge: 74%',
-  },
-  {
-    id: 'tmpl-04',
-    name: 'Dangerous Goods (DGR) Packaging Discrepancy',
-    category: 'Dangerous Goods (DGR)',
-    defaultSituation: 'Consignment declared as Class 3 Flammable Liquid showed micro-tear on outer UN specification packaging.',
-    defaultBackground: 'Import consignment cleared off Dubai flight KQ311; staged in designated airside hazardous bunker.',
-    defaultAssessment: 'Inner leakproof liner intact. Zero vapor or odor detected on photoionization detector. Outer fiberboard scuffed.',
-    defaultRecommendation: 'DGR Certified Specialist to inspect and apply overpack drum before domestic transshipment.',
-    defaultHazardAlert: 'Hazardous Caution: Staged in Class 3 containment vault; spill kit on standby.',
-    defaultMetrics: 'UN Number: UN 1993, Hazard Class: Class 3, Packaging Group: PG II',
-  },
-  {
-    id: 'tmpl-05',
-    name: 'Airway Bill (AWB) Customs & Manifest Discrepancy',
-    category: 'Customs & KRA Bonded Clearance',
-    defaultSituation: 'Inbound shipment physical piece count mismatch against electronic Airway Bill (e-AWB) manifest.',
-    defaultBackground: 'Consolidated commercial import cargo cleared off flight KQ412 from Johannesburg.',
-    defaultAssessment: 'Manifest indicates 48 cartons; physical unload tally indicates 47 cartons received in Cage 3.',
-    defaultRecommendation: 'File Cargo Irregularity Report (CIR) with KQ flight handling and notify KRA customs officer on duty.',
-    defaultHazardAlert: 'Bonded Alert: Consignment locked in High-Security Cage pending discrepancy clearance.',
-    defaultMetrics: 'AWB Ref: 706-99214012, Manifested: 48 pcs, Physical Tally: 47 pcs (-1)',
-  },
+    id: 'sus-03',
+    shiftId: 'hnd-prev-02',
+    shiftCode: 'KQ-2026-EXP-NIGHT-02',
+    departmentName: 'Transit & Cross-Dock Hub',
+    supervisorName: 'Brian Mutua',
+    supervisorRole: 'Terminal Logistics Manager',
+    timestamp: '2026-10-31 07:20 EAT',
+    // Q1=5, Q2=1, Q3=4, Q4=1, Q5=5, Q6=2, Q7=5, Q8=1, Q9=4, Q10=2
+    // Odd: 4+3+4+4+3=18; Even: 4+4+3+4+3=18; sum=36 * 2.5 = 90.0
+    scores: [5, 1, 4, 1, 5, 2, 5, 1, 4, 2],
+    totalScore: 90.0,
+    grade: 'A',
+    adjectiveRating: 'Excellent',
+    percentileBenchmark: 95,
+    debriefNotes: 'Outstanding usability compared to the previous legacy manual system. Non-repudiation log prevents shift disputes.',
+    operationalBottlenecks: 'None noted.',
+    signoffVerificationFeedback: 'Seamless peer-to-peer signoff.'
+  }
 ];
+
+
+

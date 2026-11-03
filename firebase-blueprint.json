@@ -2,7 +2,7 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "Registered healthcare and operational staff profile",
+      "description": "Registered warehouse logistics and operational staff profile",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -38,7 +38,7 @@
     },
     "Task": {
       "title": "Task",
-      "description": "Cross-shift actionable order or clinical task",
+      "description": "Cross-shift actionable order or freight task",
       "type": "object",
       "properties": {
         "taskId": { "type": "string" },
@@ -54,7 +54,7 @@
     },
     "Incident": {
       "title": "Incident",
-      "description": "Operational hazard or adverse event tracking",
+      "description": "Operational hazard or warehouse event tracking",
       "type": "object",
       "properties": {
         "incidentId": { "type": "string" },
@@ -68,6 +68,21 @@
         "createdAt": { "type": "string" }
       },
       "required": ["incidentId", "departmentId", "title", "severity", "status"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "Warehouse operational zone or freight facility unit",
+      "type": "object",
+      "properties": {
+        "departmentId": { "type": "string" },
+        "code": { "type": "string" },
+        "name": { "type": "string" },
+        "building": { "type": "string" },
+        "floor": { "type": "string" },
+        "capacity": { "type": "number" },
+        "headOfDepartment": { "type": "string" }
+      },
+      "required": ["departmentId", "code", "name"]
     },
     "AdminOverrideLog": {
       "title": "AdminOverrideLog",
@@ -90,13 +105,17 @@
       "schema": "User",
       "description": "User profiles and RBAC role assignments"
     },
+    "/departments/{departmentId}": {
+      "schema": "Department",
+      "description": "Warehouse operational facility zones"
+    },
     "/shifts/{shiftId}": {
       "schema": "Shift",
       "description": "Shift handover sessions and status records"
     },
     "/tasks/{taskId}": {
       "schema": "Task",
-      "description": "Cross-shift clinical and operational action queue"
+      "description": "Cross-shift freight and logistics action queue"
     },
     "/incidents/{incidentId}": {
       "schema": "Incident",

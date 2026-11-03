@@ -3,70 +3,49 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default Deny Catch-All
-    match /{document=**} {
-      allow read, write: if false;
+    // Default connection test doc
+    match /test/{docId} {
+      allow read, write: if true;
     }
 
-    // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
+    // Facility Zones & Departments Collection
+    match /departments/{deptId} {
+      allow read, write: if true;
     }
 
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'ianmutuma7@gmail.com' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
-    }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    // Admins Collection
-    match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // Users Collection
-    match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
-    }
-
-    // Shifts Collection
+    // Shifts & Handover Sessions Collection (including subcollections like cases)
     match /shifts/{shiftId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow read, write: if true;
+      match /{allSubcollections=**} {
+        allow read, write: if true;
+      }
     }
 
-    // Tasks Collection
+    // Tasks Hub Collection
     match /tasks/{taskId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow read, write: if true;
     }
 
     // Incidents Collection
     match /incidents/{incidentId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
 
-    // Admin Overrides Audit Log
+    // Admin Overrides Audit Log (Immutable writes)
     match /admin_overrides/{overrideId} {
-      allow read: if isSignedIn();
-      allow create: if isAdmin();
-      allow update, delete: if false; // Immutable audit log
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Institutional Operational Settings
+    match /settings/{settingId} {
+      allow read, write: if true;
     }
   }
 }

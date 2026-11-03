@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useHandover } from '../../context/HandoverContext';
-import { AcuityLevel, OperationalTemplate } from '../../types';
-import { X, AlertCircle, LayoutTemplate, Sparkles } from 'lucide-react';
+import { AcuityLevel } from '../../types';
+import { X, AlertCircle, Database, CheckCircle2 } from 'lucide-react';
 import { SbarProtocolIcon } from '../common/CustomSvgIcons';
 
 interface NewCaseModalProps {
@@ -10,9 +10,8 @@ interface NewCaseModalProps {
 }
 
 export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) => {
-  const { addCase, templates, categories } = useHandover();
+  const { addCase, categories } = useHandover();
 
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [subjectRef, setSubjectRef] = useState('');
   const [category, setCategory] = useState(categories[0] || 'Air Cargo & ULD Staging');
   const [isCustomCategory, setIsCustomCategory] = useState(false);
@@ -23,69 +22,56 @@ export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) =
   const [assessment, setAssessment] = useState('');
   const [recommendation, setRecommendation] = useState('');
   const [hazardAlert, setHazardAlert] = useState('');
-  const [vitalsInput, setVitalsInput] = useState('Hydraulic Pressure: 175 bar, Battery: 88%, Temp: 21°C');
+  const [vitalsInput, setVitalsInput] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   if (!isOpen) return null;
-
-  const handleApplyTemplate = (tmpl: OperationalTemplate) => {
-    setSelectedTemplateId(tmpl.id);
-    if (!subjectRef) {
-      setSubjectRef(`${tmpl.name} (Unit/Zone Ref)`);
-    }
-    setCategory(tmpl.category);
-    setIsCustomCategory(false);
-    setSituation(tmpl.defaultSituation);
-    setBackground(tmpl.defaultBackground);
-    setAssessment(tmpl.defaultAssessment);
-    setRecommendation(tmpl.defaultRecommendation);
-    if (tmpl.defaultHazardAlert) {
-      setHazardAlert(tmpl.defaultHazardAlert);
-    }
-    if (tmpl.defaultMetrics) {
-      setVitalsInput(tmpl.defaultMetrics);
-    }
-  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!subjectRef.trim() || !situation.trim() || !recommendation.trim()) return;
 
+    setIsSaving(true);
+
     // Parse simple comma-separated metrics
-    const vitalsOrMetrics = vitalsInput
-      .split(',')
-      .map((item) => {
-        const parts = item.split(':');
-        if (parts.length >= 2) {
-          return {
-            label: parts[0].trim(),
-            value: parts.slice(1).join(':').trim(),
-            isAbnormal: false,
-          };
-        }
-        return null;
-      })
-      .filter((v): v is { label: string; value: string; isAbnormal: boolean } => v !== null);
+    const vitalsOrMetrics = vitalsInput.trim()
+      ? vitalsInput
+          .split(',')
+          .map((item) => {
+            const parts = item.split(':');
+            if (parts.length >= 2) {
+              return {
+                label: parts[0].trim(),
+                value: parts.slice(1).join(':').trim(),
+                isAbnormal: false,
+              };
+            }
+            return null;
+          })
+          .filter((v): v is { label: string; value: string; isAbnormal: boolean } => v !== null)
+      : undefined;
 
     const finalCategory = isCustomCategory ? customCategoryText.trim() : category;
 
     addCase({
-      subjectRef,
+      subjectRef: subjectRef.trim(),
       category: finalCategory || 'Warehouse Operations & MHE',
       acuity,
-      situation,
-      background: background || 'None documented.',
-      assessment,
-      recommendation,
-      isolationOrHazardAlert: hazardAlert.trim() ? hazardAlert : undefined,
+      situation: situation.trim(),
+      background: background.trim() || 'Baseline parameters recorded.',
+      assessment: assessment.trim() || 'Visual and operational telemetry logged.',
+      recommendation: recommendation.trim(),
+      isolationOrHazardAlert: hazardAlert.trim() ? hazardAlert.trim() : undefined,
       vitalsOrMetrics,
       updatedBy: 'On-Duty Shift Lead',
     });
 
+    setIsSaving(false);
     onClose();
+
     // Reset form
-    setSelectedTemplateId('');
     setSubjectRef('');
-    setCategory(categories[0] || 'Warehouse Operations & MHE');
+    setCategory(categories[0] || 'Air Cargo & ULD Staging');
     setCustomCategoryText('');
     setIsCustomCategory(false);
     setSituation('');
@@ -93,6 +79,7 @@ export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) =
     setAssessment('');
     setRecommendation('');
     setHazardAlert('');
+    setVitalsInput('');
   };
 
   return (
@@ -105,10 +92,10 @@ export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) =
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Log New SBAR Operational Record
+                Input New SBAR Handover Record
               </h2>
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                Standardized Handover Entry · Structured SBAR Protocol Applied to Industrial Operations
+                Direct manual entry · Saved directly to institutional database
               </span>
             </div>
           </div>
@@ -119,41 +106,6 @@ export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) =
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Quick Admin-Configured Template Selector */}
-        {templates.length > 0 && (
-          <div className="mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <LayoutTemplate className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-                Apply Operational Template (Admin Configured)
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">
-                Click to prefill SBAR fields
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {templates.map((tmpl) => {
-                const isSelected = selectedTemplateId === tmpl.id;
-                return (
-                  <button
-                    key={tmpl.id}
-                    type="button"
-                    onClick={() => handleApplyTemplate(tmpl)}
-                    className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
-                      isSelected
-                        ? 'bg-teal-700 text-white border-teal-700 dark:bg-teal-600 dark:border-teal-600 shadow-xs'
-                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-teal-500'
-                    }`}
-                  >
-                    <Sparkles className="w-3 h-3 opacity-70" />
-                    <span>{tmpl.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           {/* Top row: Subject & Category */}
@@ -175,14 +127,14 @@ export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) =
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Operational Classification / Workstream
+                  Operational Workstream
                 </label>
                 <button
                   type="button"
                   onClick={() => setIsCustomCategory(!isCustomCategory)}
                   className="text-[10px] text-teal-600 dark:text-teal-400 hover:underline cursor-pointer"
                 >
-                  {isCustomCategory ? 'Pick standard' : 'Enter custom'}
+                  {isCustomCategory ? 'Select existing' : 'Type custom'}
                 </button>
               </div>
 
@@ -210,10 +162,10 @@ export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          {/* Acuity Level Selector (Clean segmented control) */}
+          {/* Acuity Level Selector */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-              Acuity / Priority Level
+              Priority & Operational Status
             </label>
             <div className="grid grid-cols-4 gap-2">
               {(['stable', 'observation', 'unstable', 'critical'] as AcuityLevel[]).map((level) => {
@@ -242,74 +194,74 @@ export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          {/* SBAR 4 Quadrants */}
+          {/* SBAR 4 Quadrants - Pure Input */}
           <div className="space-y-3 pt-2">
             <div>
               <label className="block text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1">
-                <span className="font-bold text-teal-700 dark:text-teal-400">S — Situation</span> (What is happening right now?) *
+                <span className="font-bold text-teal-700 dark:text-teal-400">S — Situation</span> (What is the active condition / state?) *
               </label>
               <textarea
                 required
                 rows={2}
                 value={situation}
                 onChange={(e) => setSituation(e.target.value)}
-                placeholder="State acute operational concerns, machine breakdown, pallet hazard, or dock stoppage..."
+                placeholder="State current event, machinery warning, staging status, or active queue condition..."
                 className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1">
-                <span className="font-bold text-teal-700 dark:text-teal-400">B — Background</span> (What is the operational context / baseline?)
+                <span className="font-bold text-teal-700 dark:text-teal-400">B — Background</span> (Context, origin, runtime history)
               </label>
               <textarea
                 rows={2}
                 value={background}
                 onChange={(e) => setBackground(e.target.value)}
-                placeholder="Equipment service hours, previous maintenance, shipment origin, container manifest..."
+                placeholder="Equipment runtime hours, flight/manifest origin, inspection history, prior shift notes..."
                 className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1">
-                <span className="font-bold text-teal-700 dark:text-teal-400">A — Assessment</span> (What are the objective findings?)
+                <span className="font-bold text-teal-700 dark:text-teal-400">A — Assessment</span> (Inspection findings & verification)
               </label>
               <textarea
                 rows={2}
                 value={assessment}
                 onChange={(e) => setAssessment(e.target.value)}
-                placeholder="Diagnostic telemetry, hydraulic pressure readings, core temperatures, visual damage, error codes..."
+                placeholder="Visual verification, sensor measurements, container seal state, checklist results..."
                 className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-900 dark:text-slate-100 mb-1">
-                <span className="font-bold text-teal-700 dark:text-teal-400">R — Recommendation</span> (What must the incoming shift do?) *
+                <span className="font-bold text-teal-700 dark:text-teal-400">R — Recommendation</span> (Required handover action for incoming lead) *
               </label>
               <textarea
                 required
                 rows={2}
                 value={recommendation}
                 onChange={(e) => setRecommendation(e.target.value)}
-                placeholder="Specific instructions for incoming lead: vendor technician escort, battery equalizing, quarantine hold..."
+                placeholder="Direct mandatory actions: schedule maintenance, release KRA seal, verify temperature, swap battery..."
                 className="w-full px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
               />
             </div>
           </div>
 
-          {/* Metrics & Hazards */}
+          {/* Metrics & Hazard alert */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Telemetry & Key Metrics (Comma-separated)
+                Telemetry & Readings (Optional: Key: Value, Key: Value)
               </label>
               <input
                 type="text"
                 value={vitalsInput}
                 onChange={(e) => setVitalsInput(e.target.value)}
-                placeholder="Hydraulic Pressure: 180 bar, Battery: 88%"
+                placeholder="e.g. Battery: 85%, Hydraulic: 180 bar, Temp: +4°C"
                 className="w-full px-3 py-2 text-xs font-mono bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
               />
             </div>
@@ -317,32 +269,41 @@ export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) =
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
                 <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                LOTO / Safety Precautions / Hazard Alert
+                Safety Caution / LOTO / Quarantine Notice
               </label>
               <input
                 type="text"
                 value={hazardAlert}
                 onChange={(e) => setHazardAlert(e.target.value)}
-                placeholder="e.g. LOTO Tag #881 on ignition, chemical spill barricade"
+                placeholder="e.g. Lockout Tag #204, bonded cage isolation"
                 className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 rounded-lg shadow-xs cursor-pointer transition-colors"
-            >
-              Save SBAR Record
-            </button>
+          <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-800">
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-mono">
+              <Database className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              Saves directly to Cloud Firestore & local ledger
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="px-4 py-2 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 rounded-lg shadow-xs cursor-pointer transition-colors flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {isSaving ? 'Saving to Database...' : 'Save to Database'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
