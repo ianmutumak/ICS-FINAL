@@ -1,0 +1,6 @@
+{
+  "name": "Zamu-Check | Shift Handover System",
+  "description": "Shift turnover and operational governance platform for Kenya Airways cargo and bonded freight warehouse operations, enforcing SBAR protocol records, equipment custody verification, and cryptographic signoffs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
