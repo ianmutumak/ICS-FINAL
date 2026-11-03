@@ -1,0 +1,110 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered healthcare and operational staff profile",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "staffNumber": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "department": { "type": "string" },
+        "email": { "type": "string" },
+        "isAdmin": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "on_leave", "suspended"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "staffNumber", "name", "role", "department"]
+    },
+    "Shift": {
+      "title": "Shift",
+      "description": "Shift handover session and turnover record",
+      "type": "object",
+      "properties": {
+        "shiftId": { "type": "string" },
+        "handoverCode": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "shiftType": { "type": "string", "enum": ["morning", "evening", "night"] },
+        "shiftDate": { "type": "string" },
+        "status": { "type": "string", "enum": ["scheduled", "in_progress", "pending_signoff", "completed"] },
+        "leadOutgoingId": { "type": "string" },
+        "leadIncomingId": { "type": "string" },
+        "transitionDurationMinutes": { "type": "number" },
+        "isOverridden": { "type": "boolean" },
+        "overrideReason": { "type": "string" }
+      },
+      "required": ["shiftId", "handoverCode", "departmentId", "shiftType", "status"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Cross-shift actionable order or clinical task",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string" },
+        "title": { "type": "string" },
+        "priority": { "type": "string", "enum": ["urgent", "high", "normal"] },
+        "departmentId": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "dueTime": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "carried_over"] },
+        "carriedOverFromPrevious": { "type": "boolean" }
+      },
+      "required": ["taskId", "title", "departmentId", "priority", "status"]
+    },
+    "Incident": {
+      "title": "Incident",
+      "description": "Operational hazard or adverse event tracking",
+      "type": "object",
+      "properties": {
+        "incidentId": { "type": "string" },
+        "departmentId": { "type": "string" },
+        "title": { "type": "string" },
+        "severity": { "type": "string", "enum": ["critical", "major", "moderate", "minor"] },
+        "status": { "type": "string", "enum": ["open", "investigating", "resolved"] },
+        "reportedBy": { "type": "string" },
+        "resolvedBy": { "type": "string" },
+        "mitigationNotes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["incidentId", "departmentId", "title", "severity", "status"]
+    },
+    "AdminOverrideLog": {
+      "title": "AdminOverrideLog",
+      "description": "Privileged audit trail of administrative shift interventions",
+      "type": "object",
+      "properties": {
+        "overrideId": { "type": "string" },
+        "shiftId": { "type": "string" },
+        "adminId": { "type": "string" },
+        "adminName": { "type": "string" },
+        "actionType": { "type": "string" },
+        "reason": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["overrideId", "shiftId", "adminId", "reason", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and RBAC role assignments"
+    },
+    "/shifts/{shiftId}": {
+      "schema": "Shift",
+      "description": "Shift handover sessions and status records"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Cross-shift clinical and operational action queue"
+    },
+    "/incidents/{incidentId}": {
+      "schema": "Incident",
+      "description": "Incident carry-overs and resolution logs"
+    },
+    "/admin_overrides/{overrideId}": {
+      "schema": "AdminOverrideLog",
+      "description": "Administrative override ledger"
+    }
+  }
+}
