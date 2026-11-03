@@ -116,7 +116,7 @@ interface HandoverContextType {
   currentUser: UserStaff;
   staffList: UserStaff[];
   signInUser: (staffNumber: string, pin: string, adminPasskey?: string) => { success: boolean; error?: string };
-  signUpUser: (userData: Omit<UserStaff, 'id' | 'avatarSeed'>, adminPasskey?: string) => UserStaff;
+  signUpUser: (userData: Omit<UserStaff, 'id' | 'avatarSeed'>, adminPasskey?: string) => { success: boolean; user?: UserStaff; error?: string };
   switchUser: (userId: string) => void;
   signOutUser: () => void;
   
@@ -474,7 +474,12 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return { success: true };
   };
 
-  const signUpUser = (userData: Omit<UserStaff, 'id' | 'avatarSeed'>, adminPasskey?: string) => {
+  const signUpUser = (userData: Omit<UserStaff, 'id' | 'avatarSeed'>, adminPasskey?: string): { success: boolean; user?: UserStaff; error?: string } => {
+    // Duplicate staff number guard
+    if (staffList.some((s) => s.staffNumber.trim().toLowerCase() === userData.staffNumber.trim().toLowerCase())) {
+      return { success: false, error: 'A worker with this Badge ID already exists in the roster.' };
+    }
+
     const initials = userData.name
       .split(' ')
       .map((n) => n[0])
@@ -498,7 +503,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setHasAdminClearance(isGrantedAdmin);
     setActiveTab(isGrantedAdmin ? 'admin' : 'roster');
 
-    return newUser;
+    return { success: true, user: newUser };
   };
 
   const switchUser = (userId: string) => {

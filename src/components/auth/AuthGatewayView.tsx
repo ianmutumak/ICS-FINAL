@@ -17,7 +17,7 @@ export const AuthGatewayView: React.FC = () => {
 
   // Sign In State
   const [staffNumberInput, setStaffNumberInput] = useState('');
-  const [pinInput, setPinInput] = useState('1234');
+  const [pinInput, setPinInput] = useState('');
   const [enableAdminClearance, setEnableAdminClearance] = useState(false);
   const [adminPasskeyInput, setAdminPasskeyInput] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -28,12 +28,20 @@ export const AuthGatewayView: React.FC = () => {
   const [department, setDepartment] = useState(departments[0]?.name || 'KQ Import Bonded Freight Warehouse');
   const [role, setRole] = useState('Shift Operations Lead');
   const [qualification, setQualification] = useState('IATA Cargo / MHE Certified');
-  const [newPin, setNewPin] = useState('1234');
+  const [newPin, setNewPin] = useState('');
   const [signupAdminPasskey, setSignupAdminPasskey] = useState('');
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
+    if (staffNumberInput.trim().length === 0) {
+      setErrorMessage('Please enter your Worker ID / Badge Number.');
+      return;
+    }
+    if (pinInput.trim().length < 4) {
+      setErrorMessage('PIN must be at least 4 digits.');
+      return;
+    }
     const res = signInUser(
       staffNumberInput.trim(),
       pinInput.trim(),
@@ -51,8 +59,16 @@ export const AuthGatewayView: React.FC = () => {
       setErrorMessage('Please fill in all required fields.');
       return;
     }
+    if (newStaffNumber.trim().length < 4) {
+      setErrorMessage('Badge / Worker ID must be at least 4 characters.');
+      return;
+    }
+    if (newPin.trim().length < 4) {
+      setErrorMessage('Security PIN must be at least 4 digits.');
+      return;
+    }
 
-    signUpUser(
+    const res = signUpUser(
       {
         name: fullName.trim(),
         staffNumber: newStaffNumber.trim().toUpperCase(),
@@ -63,6 +79,9 @@ export const AuthGatewayView: React.FC = () => {
       },
       signupAdminPasskey.trim() || undefined
     );
+    if (!res.success) {
+      setErrorMessage(res.error || 'Registration failed. Please try again.');
+    }
   };
 
   // Demo autofill shortcuts
@@ -171,6 +190,9 @@ export const AuthGatewayView: React.FC = () => {
                 <input
                   type="password"
                   required
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value)}
                   placeholder="Enter 4-digit PIN"
@@ -197,7 +219,7 @@ export const AuthGatewayView: React.FC = () => {
                   <div className="mt-2.5 p-3 rounded-xl bg-slate-900/80 border border-amber-900/50 space-y-1.5 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between text-[11px] text-amber-300 font-semibold">
                       <span>Executive Clearance Key *</span>
-                      <span className="font-mono text-[10px] text-slate-400">Default: {MASTER_ADMIN_PASSKEY}</span>
+                      <span className="font-mono text-[10px] text-slate-400">Hint: Contact your supervisor</span>
                     </div>
                     <input
                       type="password"
@@ -258,10 +280,12 @@ export const AuthGatewayView: React.FC = () => {
                   <input
                     type="password"
                     required
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     maxLength={6}
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value)}
-                    placeholder="1234"
+                    placeholder="Set 4-6 digit PIN"
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
                   />
                 </div>

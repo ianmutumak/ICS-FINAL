@@ -23,7 +23,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   
   // Sign In state
   const [signInStaffNumber, setSignInStaffNumber] = useState('');
-  const [signInPin, setSignInPin] = useState('1234');
+  const [signInPin, setSignInPin] = useState('');
   const [signInAdminPasskey, setSignInAdminPasskey] = useState('');
   const [enableAdminKey, setEnableAdminKey] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -37,7 +37,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [staffNumber, setStaffNumber] = useState('');
   const [department, setDepartment] = useState(departments[0]?.name || 'KQ Import Bonded Freight Warehouse');
   const [role, setRole] = useState('Ramp Lead / Cargo Marshall');
-  const [pin, setPin] = useState('1234');
+  const [pin, setPin] = useState('');
   const [qualification, setQualification] = useState('IATA Cargo / Dangerous Goods Cat 6');
   const [signupPasskey, setSignupPasskey] = useState('');
 
@@ -79,8 +79,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName.trim() || !staffNumber.trim()) return;
+    if (pin.trim().length < 4) {
+      setAuthError('Security PIN must be at least 4 digits.');
+      return;
+    }
 
-    signUpUser({
+    const res = signUpUser({
       name: fullName.trim(),
       staffNumber: staffNumber.trim().toUpperCase(),
       department,
@@ -88,6 +92,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       qualification: qualification.trim(),
       pin,
     });
+    if (!res.success) {
+      setAuthError(res.error || 'Registration failed. Please try again.');
+      return;
+    }
     onClose();
   };
 
@@ -225,6 +233,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               <input
                 type="password"
                 required
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
                 placeholder="Enter 4-digit PIN"
                 value={signInPin}
                 onChange={(e) => setSignInPin(e.target.value)}
@@ -254,7 +265,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     type="password"
                     value={signInAdminPasskey}
                     onChange={(e) => setSignInAdminPasskey(e.target.value)}
-                    placeholder="Enter passkey (ZAMU-ADMIN-2026)"
+                    placeholder="Enter master passkey"
                     className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800 rounded font-mono text-xs text-slate-900 dark:text-slate-100"
                   />
                 </div>
@@ -288,7 +299,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <label className="font-semibold text-slate-700 dark:text-slate-300">
                   Master Admin Passkey *
                 </label>
-                <span className="font-mono text-[10px] text-slate-400">Default: {MASTER_ADMIN_PASSKEY}</span>
+
               </div>
               <input
                 type="password"
@@ -349,8 +360,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <input
                   type="password"
                   required
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   maxLength={6}
-                  placeholder="1234"
+                  placeholder="Set 4-6 digit PIN"
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 font-mono"
