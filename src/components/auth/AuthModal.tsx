@@ -199,7 +199,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             }`}
           >
             <Lock className="w-3 h-3" />
-            <span>Admin Unlock</span>
+            <span>Supervisor Access</span>
           </button>
         </div>
 
@@ -316,7 +316,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               className="w-full py-2.5 px-3 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>Verify Passkey & Launch Admin Console</span>
+              <span>Authorize & Access Admin Console</span>
             </button>
           </form>
         )}
@@ -429,7 +429,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         {mode === 'switch' && (
           <div className="space-y-2 text-xs pt-1">
             <span className="text-[11px] text-slate-500 dark:text-slate-400 block mb-2">
-              Select any verified practitioner to immediately test handovers and dual sign-offs:
+              Select an active institutional profile to switch duty session:
             </span>
             <div className="space-y-1.5 max-h-56 overflow-y-auto">
               {staffList.map((staff) => {

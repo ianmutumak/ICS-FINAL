@@ -174,16 +174,16 @@ export const StatisticsAnalyticsView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Capstone Attribution Header */}
+      {/* Operational Analytics Status Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-lg bg-teal-50/70 dark:bg-slate-800/80 border border-teal-200/60 dark:border-slate-700/60 text-xs">
         <div className="flex items-center gap-2">
           <Award className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" />
           <span className="text-slate-800 dark:text-slate-200 font-medium">
-            <strong className="text-teal-900 dark:text-teal-300 font-semibold">Strathmore University ICS Capstone</strong> · Kiome Ian Mutuma (Reg No: 144861) · Research Supervisor: Dr. Esther Khakata
+            <strong className="text-teal-900 dark:text-teal-300 font-semibold">Operational QA & Governance</strong> · Transition Efficiency & Usability Metrics
           </span>
         </div>
         <div className="text-[11px] font-mono text-teal-700 dark:text-teal-300">
-          Standardized 10-Item System Usability Scale (SUS) Evaluation Suite
+          Standardized System Usability Scale (SUS) Benchmarks
         </div>
       </div>
 
@@ -206,7 +206,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
               Handover Statistics & Usability Debrief
             </h1>
             <p className="text-xs text-slate-600 dark:text-slate-400 max-w-3xl leading-relaxed">
-              Real-time shift turnover cycle telemetry, task carry-over velocity, dual sign-off compliance, and standardized System Usability Scale (Brooke, 1996) debrief evaluations.
+              Real-time shift turnover cycle telemetry, task carry-over velocity, dual sign-off compliance, and standardized System Usability Scale (SUS) debrief evaluations.
             </p>
           </div>
 
@@ -628,7 +628,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
                   Odd Items: (X - 1) · Even Items: (5 - X)
                 </span>
                 <span className="text-[10px] text-slate-400 mt-1 block">
-                  Strathmore ICS Capstone Evaluation Instrument
+                  Standard Operational Usability Protocol
                 </span>
               </div>
               <FileCheck className="w-8 h-8 text-slate-400 opacity-80" />

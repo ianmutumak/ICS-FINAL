@@ -7,7 +7,6 @@ import {
   DualSignoffStampIcon,
   ErdBranchIcon,
   CustodyShieldIcon,
-  AcademicThesisIcon,
 } from '../common/CustomSvgIcons';
 import { SectorType } from '../../types';
 
@@ -201,39 +200,27 @@ export const PersonalizationDrawer: React.FC<PersonalizationDrawerProps> = ({ is
               </div>
             </div>
 
-            {/* Section 4: Hand-Crafted SVG Showcase */}
+            {/* Operational Governance Framework */}
             <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                <Sparkles className="w-3.5 h-3.5 text-teal-500" />
-                <span>Custom Vector Icon Assets</span>
+                <CustodyShieldIcon className="w-3.5 h-3.5 text-teal-500" />
+                <span>Operational Governance Framework</span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                Non-generic hand-crafted SVG iconography tailored specifically for the Zamu-Check handover architecture:
+                ZAMU-CHECK enforces verified continuous-process standards across every shift turnover:
               </p>
               <div className="grid grid-cols-3 gap-2">
                 <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/40">
-                  <ZamuLogoIcon className="w-6 h-6 text-teal-600 dark:text-teal-400" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">Loop Handover</span>
-                </div>
-                <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/40">
                   <SbarProtocolIcon className="w-6 h-6 text-teal-600 dark:text-teal-400" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">SBAR Crest</span>
+                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">SBAR Protocol</span>
                 </div>
                 <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/40">
                   <DualSignoffStampIcon className="w-6 h-6 text-teal-600 dark:text-teal-400" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">Dual Seal</span>
-                </div>
-                <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/40">
-                  <ErdBranchIcon className="w-6 h-6 text-teal-600 dark:text-teal-400" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">Schema FKs</span>
+                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">Dual Sign-Off</span>
                 </div>
                 <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/40">
                   <CustodyShieldIcon className="w-6 h-6 text-teal-600 dark:text-teal-400" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">Custody Safe</span>
-                </div>
-                <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 text-center flex flex-col items-center gap-1.5 bg-slate-50 dark:bg-slate-800/40">
-                  <AcademicThesisIcon className="w-6 h-6 text-teal-600 dark:text-teal-400" />
-                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">DSRM Scholar</span>
+                  <span className="text-[10px] text-slate-600 dark:text-slate-400 font-mono">Custody Ledger</span>
                 </div>
               </div>
             </div>

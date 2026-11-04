@@ -133,17 +133,17 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Capstone Attribution Header */}
+      {/* Operational Protocol Status Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-lg bg-teal-50/70 dark:bg-slate-800/80 border border-teal-200/60 dark:border-slate-700/60 text-xs">
         <div className="flex items-center gap-2">
-          <Award className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" />
+          <ShieldCheck className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" />
           <span className="text-slate-800 dark:text-slate-200 font-medium">
-            <strong className="text-teal-900 dark:text-teal-300 font-semibold">ZAMU-CHECK</strong> · Strathmore University ICS Capstone (Kiome Ian Mutuma · Reg: 144861 · Supervisor: Dr. Esther Khakata)
+            <strong className="text-teal-900 dark:text-teal-300 font-semibold">Kenya Airways Cargo Hub</strong> · Airside & Warehouse Shift Turnover System
           </span>
         </div>
         <div className="flex items-center gap-2 font-mono text-[11px] text-teal-700 dark:text-teal-300">
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Operational Live Handover Protocol</span>
+          <span>Active Operational Handover Protocol</span>
         </div>
       </div>
 
@@ -171,7 +171,7 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
             </h1>
 
             <p className="text-xs text-slate-600 dark:text-slate-400 max-w-3xl leading-relaxed">
-              Outgoing floor lead{' '}
+              Outgoing duty lead{' '}
               <strong className="text-slate-900 dark:text-slate-200 font-semibold">
                 {activeHandover.leadOutgoing.name} ({activeHandover.leadOutgoing.role})
               </strong>{' '}
@@ -179,7 +179,7 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
               <strong className="text-slate-900 dark:text-slate-200 font-semibold">
                 {activeHandover.leadIncoming.name} ({activeHandover.leadIncoming.role})
               </strong>
-              . All data saved to persistent institutional database.
+              .
             </p>
           </div>
 
