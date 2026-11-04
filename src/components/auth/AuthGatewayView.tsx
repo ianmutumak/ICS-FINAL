@@ -84,7 +84,7 @@ export const AuthGatewayView: React.FC = () => {
     }
   };
 
-  // Demo autofill shortcuts
+  // Quick profile shortcuts
   const autofillStaff = () => {
     setStaffNumberInput('KQ-OPS-9204');
     setPinInput('1234');
@@ -211,14 +211,14 @@ export const AuthGatewayView: React.FC = () => {
                   />
                   <span className="text-[11px] font-medium flex items-center gap-1.5">
                     <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                    Authorize with Secret Master Admin Passkey
+                    Authorize with Supervisor Security Passkey
                   </span>
                 </label>
 
                 {enableAdminClearance && (
                   <div className="mt-2.5 p-3 rounded-xl bg-slate-900/80 border border-amber-900/50 space-y-1.5 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between text-[11px] text-amber-300 font-semibold">
-                      <span>Executive Clearance Key *</span>
+                      <span>Supervisor Clearance Key *</span>
                       <span className="font-mono text-[10px] text-slate-400">Hint: Contact your supervisor</span>
                     </div>
                     <input
@@ -237,7 +237,7 @@ export const AuthGatewayView: React.FC = () => {
                 className="w-full py-2.5 px-4 font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors cursor-pointer shadow-lg text-sm mt-2 flex items-center justify-center gap-2"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Verify Credentials & Enter Workspace</span>
+                <span>Verify Credentials & Sign In</span>
               </button>
             </form>
           )}
@@ -337,13 +337,13 @@ export const AuthGatewayView: React.FC = () => {
 
               <div>
                 <label className="block text-slate-400 font-medium mb-1">
-                  Optional Master Admin Passkey (For Supervisor Clearance)
+                  Supervisor Clearance Passkey (Optional)
                 </label>
                 <input
                   type="password"
                   value={signupAdminPasskey}
                   onChange={(e) => setSignupAdminPasskey(e.target.value)}
-                  placeholder="Enter Passkey if elevating to Supervisor"
+                  placeholder="Enter authorization passkey"
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
                 />
               </div>
@@ -352,15 +352,15 @@ export const AuthGatewayView: React.FC = () => {
                 type="submit"
                 className="w-full py-2.5 px-4 font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors cursor-pointer shadow-lg text-sm mt-2"
               >
-                Onboard Warehouse Worker
+                Register Operational Staff
               </button>
             </form>
           )}
 
-          {/* Quick Demo Fill Buttons for Testing & Grading */}
+          {/* Quick Access Operational Profiles */}
           <div className="pt-3 border-t border-slate-800/80 space-y-2">
             <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block text-center">
-              Evaluation Demo Credentials
+              Active Institutional Profiles
             </span>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -369,7 +369,7 @@ export const AuthGatewayView: React.FC = () => {
                 className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition-colors cursor-pointer"
               >
                 <span className="text-[11px] font-semibold text-slate-200 block truncate">
-                  Ramp Marshall (Standard)
+                  Ramp Marshall
                 </span>
                 <span className="text-[9px] text-slate-400 font-mono block">
                   David Kiprop (KQ-OPS-9204)
@@ -386,7 +386,7 @@ export const AuthGatewayView: React.FC = () => {
                   Cargo Duty Supervisor
                 </span>
                 <span className="text-[9px] text-slate-400 font-mono block">
-                  Mary Wanjiku (Passkey)
+                  Mary Wanjiku (KQ-SUP-8841)
                 </span>
               </button>
             </div>

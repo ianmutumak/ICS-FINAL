@@ -21,7 +21,7 @@ export const SEED_STAFF: UserStaff[] = [
     qualification: 'IATA Cargo Operations / OSHA Warehouse Certified',
     avatarSeed: 'MW',
     pin: '1234',
-    email: 'ianmutuma7@gmail.com', // Matched with admin user email
+    email: 'm.wanjiku@kq.aero',
     isAdmin: true,
     status: 'active',
   },
