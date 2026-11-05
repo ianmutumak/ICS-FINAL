@@ -68,20 +68,18 @@ export const TaskManagerView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
+      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-mono text-teal-700 dark:text-teal-400 font-semibold">
-                Task Continuity Hub
+                Task Board
               </span>
-              <span aria-hidden="true">·</span>
-              <span>Automated Cross-Shift Roll-Over</span>
-              <span aria-hidden="true">·</span>
-              <span>Zero-Loss Operational Orders</span>
+              <span>·</span>
+              <span>Shift Orders</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Active Shift Tasks & Action Ledger
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Shift Tasks & Actions
             </h1>
           </div>
 

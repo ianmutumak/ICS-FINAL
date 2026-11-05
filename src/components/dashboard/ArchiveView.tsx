@@ -34,22 +34,19 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onStartNewShiftClick }
   return (
     <div className="space-y-6">
       {/* Header */}
-      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
+      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-mono text-teal-700 dark:text-teal-400 font-semibold">
-                Operational Shift Audit Vault
+                Shift Vault
               </span>
-              <span aria-hidden="true">·</span>
-              <span>Non-repudiation Archives</span>
+              <span>·</span>
+              <span>Audit Records</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
-              Historical Shift Handover Ledger
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white mt-1">
+              Past Shift Handovers
             </h1>
-            <p className="text-xs text-slate-600 dark:text-slate-400 max-w-2xl mt-1">
-              Immutable records of completed shift transitions, signed turnover briefs, and custody logs.
-            </p>
           </div>
 
           <div className="flex items-center gap-3">

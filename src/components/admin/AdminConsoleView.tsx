@@ -156,25 +156,20 @@ export const AdminConsoleView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Admin Header with Security & Access Control Badge */}
-      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
+      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-mono text-rose-700 dark:text-rose-400 font-semibold flex items-center gap-1">
                 <Lock className="w-3.5 h-3.5" />
-                Elevated Administrator Console
+                Admin Console
               </span>
-              <span aria-hidden="true">·</span>
-              <span>Supervisor Oversight</span>
-              <span aria-hidden="true">·</span>
-              <span>Universal Facility & Zone Access</span>
+              <span>·</span>
+              <span>Supervisor Controls</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-              Operations Governance & Access Control Center
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+              Operations Governance
             </h1>
-            <p className="text-xs text-slate-600 dark:text-slate-400 max-w-3xl leading-relaxed">
-              Authorized session for <strong className="text-slate-900 dark:text-slate-200">{currentUser.name}</strong> ({currentUser.role}). Manage worker authorizations, resolve cross-zone safety incidents, execute shift overrides, and monitor tasks across all warehouse units.
-            </p>
           </div>
 
           {/* Right Header Actions: Exit Console + Firebase Cloud Connection */}
@@ -220,7 +215,7 @@ export const AdminConsoleView: React.FC = () => {
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            User & Role Management ({staffList.length})
+            Users ({staffList.length})
           </button>
           <button
             onClick={() => setActiveAdminTab('zones')}
@@ -231,7 +226,7 @@ export const AdminConsoleView: React.FC = () => {
             }`}
           >
             <Layers className="w-3.5 h-3.5 text-teal-600" />
-            <span>Facility Operational Zones & Classifications ({departments.length})</span>
+            <span>Zones ({departments.length})</span>
           </button>
           <button
             onClick={() => setActiveAdminTab('shifts')}

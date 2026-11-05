@@ -115,10 +115,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Warehouse Personnel & Roster Access
+                Personnel Access
               </h3>
               <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                Current active session: <strong className="text-slate-700 dark:text-slate-200">{currentUser.name}</strong>
+                Active session: <strong className="text-slate-700 dark:text-slate-200">{currentUser.name}</strong>
               </span>
             </div>
           </div>
@@ -214,7 +214,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
             <div>
               <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Badge / Worker ID Number
+                Badge ID
               </label>
               <input
                 type="text"
@@ -228,7 +228,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
             <div>
               <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Security PIN / Password
+                PIN
               </label>
               <input
                 type="password"
@@ -276,7 +276,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               type="submit"
               className="w-full py-2 px-3 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 rounded-lg transition-colors cursor-pointer mt-2"
             >
-              Authenticate & Access Shifts
+              Sign In
             </button>
           </form>
         )}
@@ -284,8 +284,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         {/* Tab 4: Admin Unlock Gate */}
         {mode === 'admin_gate' && (
           <form onSubmit={handleAdminElevation} className="space-y-3.5 text-xs pt-1">
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 leading-relaxed">
-              To prevent unauthorized personnel access, the <strong>Elevated Admin Console</strong> is abstracted behind this verification gate. Provide the institutional master passkey to unlock administrative controls.
+            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-xs">
+              Supervisor clearance required to access administrative oversight and system logs.
             </div>
 
             {elevationError && (
@@ -316,7 +316,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               className="w-full py-2.5 px-3 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>Authorize & Access Admin Console</span>
+              <span>Authorize Access</span>
             </button>
           </form>
         )}
@@ -326,7 +326,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           <form onSubmit={handleSignUp} className="space-y-3 text-xs pt-1">
             <div>
               <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Full Worker / Operator Name *
+                Full Name *
               </label>
               <input
                 type="text"
@@ -341,7 +341,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Worker ID Number *
+                  Badge ID *
                 </label>
                 <input
                   type="text"
@@ -355,7 +355,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
               <div>
                 <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Access PIN (4 Digits)
+                  PIN (4 Digits)
                 </label>
                 <input
                   type="password"
@@ -373,7 +373,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
             <div>
               <label className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Operational Zone / Facility Bay
+                Operational Zone
               </label>
               <select
                 value={department}

@@ -9,18 +9,15 @@ import {
   Circle,
   FileText,
   AlertTriangle,
-  ClipboardCheck,
+  ClipboardList,
   Trash2,
-  Users,
-  Activity,
-  Check,
   ShieldAlert,
-  Award,
   Zap,
-  Layers,
   ArrowRight,
+  Package,
+  Layers,
+  CheckSquare,
 } from 'lucide-react';
-import { CustodyShieldIcon, SbarProtocolIcon, DualSignoffStampIcon } from '../common/CustomSvgIcons';
 
 interface ActiveHandoverViewProps {
   onOpenNewCase: () => void;
@@ -41,7 +38,6 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
     toggleTaskStatus,
     addTask,
     heiScore,
-    themeConfig,
   } = useHandover();
 
   const [acuityFilter, setAcuityFilter] = useState<'all' | AcuityLevel>('all');
@@ -111,8 +107,8 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
 
   const handleAcknowledgeHazard = (caseId: string, currentAlert?: string) => {
     const updatedAlert = currentAlert
-      ? `${currentAlert} · [ACKNOWLEDGED by Supervisor on duty]`
-      : '[ACKNOWLEDGED: Safe perimeter & isolation verified by supervisor]';
+      ? `${currentAlert} · [ACKNOWLEDGED by Supervisor]`
+      : '[ACKNOWLEDGED: Safe perimeter verified by supervisor]';
     updateCase(caseId, { isolationOrHazardAlert: updatedAlert });
   };
 
@@ -131,240 +127,197 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
     Deficient: 'bg-rose-500',
   }[heiScore.rating];
 
-  return (
-    <div className="space-y-6">
-      {/* Operational Protocol Status Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-lg bg-teal-50/70 dark:bg-slate-800/80 border border-teal-200/60 dark:border-slate-700/60 text-xs">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" />
-          <span className="text-slate-800 dark:text-slate-200 font-medium">
-            <strong className="text-teal-900 dark:text-teal-300 font-semibold">Kenya Airways Cargo Hub</strong> · Airside & Warehouse Shift Turnover System
-          </span>
-        </div>
-        <div className="flex items-center gap-2 font-mono text-[11px] text-teal-700 dark:text-teal-300">
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Active Operational Handover Protocol</span>
-        </div>
-      </div>
+  const isDualSigned =
+    activeHandover.signoff.incomingConfirmed && activeHandover.signoff.outgoingConfirmed;
 
+  return (
+    <div className="space-y-5">
       {/* Shift Overview Banner */}
-      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs transition-colors">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-1.5">
+      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs transition-colors">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-2.5">
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-mono text-teal-700 dark:text-teal-400 font-semibold">
+              <span className="font-mono text-teal-700 dark:text-teal-400 font-bold bg-teal-50 dark:bg-teal-950/50 px-2 py-0.5 rounded">
                 {activeHandover.handoverCode}
               </span>
-              <span aria-hidden="true">·</span>
-              <span>{activeHandover.wardOrDepartment}</span>
-              <span aria-hidden="true">·</span>
-              <span className="capitalize">{activeHandover.shiftType} Duty</span>
-              <span aria-hidden="true">·</span>
+              <span>·</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {activeHandover.wardOrDepartment}
+              </span>
+              <span>·</span>
+              <span className="capitalize">{activeHandover.shiftType} Shift</span>
+              <span>·</span>
               <span className="flex items-center gap-1 font-mono">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                 {activeHandover.shiftWindow}
               </span>
             </div>
 
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Shift Handover Management & Operations
-            </h1>
-
-            <p className="text-xs text-slate-600 dark:text-slate-400 max-w-3xl leading-relaxed">
-              Outgoing duty lead{' '}
-              <strong className="text-slate-900 dark:text-slate-200 font-semibold">
-                {activeHandover.leadOutgoing.name} ({activeHandover.leadOutgoing.role})
-              </strong>{' '}
-              transitioning operational control to incoming lead{' '}
-              <strong className="text-slate-900 dark:text-slate-200 font-semibold">
-                {activeHandover.leadIncoming.name} ({activeHandover.leadIncoming.role})
-              </strong>
-              .
-            </p>
+            {/* Clean Staff Transfer Indicator */}
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Outgoing</span>
+                <span className="font-semibold">{activeHandover.leadOutgoing.name}</span>
+                <span className="text-[10px] text-slate-400">({activeHandover.leadOutgoing.role})</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-teal-50 dark:bg-teal-950/40 text-teal-900 dark:text-teal-200 border border-teal-200/50 dark:border-teal-800/40">
+                <span className="text-[10px] uppercase font-bold text-teal-600 dark:text-teal-400">Incoming</span>
+                <span className="font-semibold">{activeHandover.leadIncoming.name}</span>
+                <span className="text-[10px] text-teal-600 dark:text-teal-400">({activeHandover.leadIncoming.role})</span>
+              </div>
+            </div>
           </div>
 
-          {/* Quick Metrics & Attestation CTA */}
+          {/* Quick Metrics & Sign-off CTA */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-4 px-4 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700/60 text-xs font-mono tabular-nums">
-              <div>
-                <span className="text-slate-500 dark:text-slate-400 block text-[10px]">CASES / ASSETS</span>
-                <span className="font-bold text-slate-900 dark:text-white text-sm">
-                  {activeHandover.cases.length}
-                </span>
+            <div className="flex items-center gap-3 px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700/60 text-xs font-mono">
+              <div className="flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-slate-400" />
+                <div>
+                  <span className="text-slate-400 block text-[9px]">CASES</span>
+                  <span className="font-bold text-slate-900 dark:text-white text-sm">
+                    {activeHandover.cases.length}
+                  </span>
+                </div>
               </div>
               <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
-              <div>
-                <span className="text-rose-600 dark:text-rose-400 block text-[10px]">CRITICAL</span>
-                <span className="font-bold text-rose-600 dark:text-rose-400 text-sm">
-                  {criticalCount + unstableCount}
-                </span>
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-500" />
+                <div>
+                  <span className="text-rose-500 block text-[9px]">CRITICAL</span>
+                  <span className="font-bold text-rose-600 dark:text-rose-400 text-sm">
+                    {criticalCount + unstableCount}
+                  </span>
+                </div>
               </div>
               <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
-              <div>
-                <span className="text-slate-500 dark:text-slate-400 block text-[10px]">CUSTODY</span>
-                <span className="font-bold text-slate-900 dark:text-white text-sm">
-                  {verifiedEqCount}/{totalEqCount}
-                </span>
+              <div className="flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-teal-600" />
+                <div>
+                  <span className="text-slate-400 block text-[9px]">CUSTODY</span>
+                  <span className="font-bold text-slate-900 dark:text-white text-sm">
+                    {verifiedEqCount}/{totalEqCount}
+                  </span>
+                </div>
               </div>
             </div>
 
             <button
               onClick={onOpenSignoff}
-              className={`px-4 py-2.5 text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-2 ${
-                activeHandover.signoff.incomingConfirmed && activeHandover.signoff.outgoingConfirmed
+              className={`px-4 py-2.5 text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-1.5 ${
+                isDualSigned
                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                   : 'bg-teal-700 hover:bg-teal-800 text-white dark:bg-teal-600 dark:hover:bg-teal-500'
               }`}
             >
               <ShieldCheck className="w-4 h-4" />
-              {activeHandover.signoff.incomingConfirmed && activeHandover.signoff.outgoingConfirmed
-                ? 'Attested & Sealed'
-                : 'Dual Sign-Off Attestation'}
+              <span>{isDualSigned ? 'Handover Sealed' : 'Dual Sign-Off'}</span>
             </button>
           </div>
         </div>
 
-        {/* Live Handover Effectiveness Index (HEI) Telemetry Strip */}
+        {/* Live HEI Telemetry Strip */}
         <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-3">
+          <div className="flex items-center justify-between gap-3 mb-2.5">
             <div className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-500" />
               <span className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-                Live Handover Effectiveness Index (HEI)
+                Handover Index (HEI)
               </span>
               <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${heiColorBadge}`}>
                 {heiScore.rating} · {heiScore.score}%
               </span>
             </div>
 
-            <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              Evaluated against SBAR Completeness (40%), Safety Gate (35%), and Custody Verification (25%)
+            <div className="flex items-center gap-3 text-xs">
+              <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
+                {activeHandover.signoff.outgoingConfirmed ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <Circle className="w-3.5 h-3.5 text-slate-300" />
+                )}
+                Outgoing
+              </span>
+              <span className="flex items-center gap-1 text-slate-600 dark:text-slate-400">
+                {activeHandover.signoff.incomingConfirmed ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                ) : (
+                  <Circle className="w-3.5 h-3.5 text-slate-300" />
+                )}
+                Incoming
+              </span>
             </div>
           </div>
 
           {/* HEI Progress Bar */}
-          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden mb-3">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden mb-3">
             <div
               className={`h-full transition-all duration-500 ${heiProgressColor}`}
               style={{ width: `${heiScore.score}%` }}
             />
           </div>
 
-          {/* 3 HEI Pillars Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-            {/* Pillar 1: SBAR Completeness */}
-            <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
-              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">1. SBAR Structure</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">
-                  {heiScore.breakdown.sbarCompleteness} / 40 pts
-                </span>
+          {/* 3 HEI Metric Chips (Compact & clean) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+            <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <span className="font-medium text-slate-700 dark:text-slate-300">SBAR Completeness</span>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                {heiScore.details.completedSbarCases} of {heiScore.details.totalCases} cases fully structured with Situation, Assessment, Recommendation.
-              </p>
+              <span className="font-mono font-bold text-slate-900 dark:text-white">
+                {heiScore.breakdown.sbarCompleteness}/40
+              </span>
             </div>
 
-            {/* Pillar 2: Safety Gate */}
-            <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
-              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">2. Safety Gate & Acknowledgment</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">
-                  {heiScore.breakdown.safetyAck} / 35 pts
-                </span>
+            <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-amber-500" />
+                <span className="font-medium text-slate-700 dark:text-slate-300">Safety Clearance</span>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                {heiScore.details.criticalAlertsTotal > 0
-                  ? `${heiScore.details.criticalAlertsAcknowledged} of ${heiScore.details.criticalAlertsTotal} critical hazard alerts acknowledged.`
-                  : 'Zero unacknowledged high-hazard flags on floor.'}
-              </p>
+              <span className="font-mono font-bold text-slate-900 dark:text-white">
+                {heiScore.breakdown.safetyAck}/35
+              </span>
             </div>
 
-            {/* Pillar 3: Equipment Custody */}
-            <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60">
-              <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 mb-1">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">3. Physical Custody Handover</span>
-                <span className="font-mono font-bold text-slate-900 dark:text-white">
-                  {heiScore.breakdown.equipmentCustody} / 25 pts
-                </span>
+            <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/60 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Package className="w-4 h-4 text-blue-500" />
+                <span className="font-medium text-slate-700 dark:text-slate-300">Equipment Custody</span>
               </div>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                {heiScore.details.equipmentChecked} of {heiScore.details.equipmentTotal} assets physically verified in joint lead walk-through.
-              </p>
+              <span className="font-mono font-bold text-slate-900 dark:text-white">
+                {heiScore.breakdown.equipmentCustody}/25
+              </span>
             </div>
-          </div>
-
-          {/* Dual Attestation Readiness Indicator */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-xs">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                {activeHandover.signoff.outgoingConfirmed ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                ) : (
-                  <Circle className="w-3.5 h-3.5 text-amber-500" />
-                )}
-                <span className="text-slate-700 dark:text-slate-300">
-                  Outgoing Lead: {activeHandover.signoff.outgoingConfirmed ? 'Signed' : 'Pending Signature'}
-                </span>
-              </div>
-              <span className="text-slate-300 dark:text-slate-600">|</span>
-              <div className="flex items-center gap-1.5">
-                {activeHandover.signoff.incomingConfirmed ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                ) : (
-                  <Circle className="w-3.5 h-3.5 text-amber-500" />
-                )}
-                <span className="text-slate-700 dark:text-slate-300">
-                  Incoming Lead: {activeHandover.signoff.incomingConfirmed ? 'Signed' : 'Pending Signature'}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={onOpenSignoff}
-              className="text-teal-700 dark:text-teal-400 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-            >
-              <span>{activeHandover.signoff.verificationHash ? 'View Non-Repudiation Hash' : 'Proceed to Dual Sign-Off'}</span>
-              <ArrowRight className="w-3 h-3" />
-            </button>
           </div>
         </div>
 
-        {/* Shift Huddle Summary Notes */}
-        <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-              Shift Briefing Notes & Facility Operational Status
-            </label>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500">
-              Direct manual entry · Auto-persisted to institutional database
-            </span>
-          </div>
+        {/* Shift Notes */}
+        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 mb-1.5">
+            <FileText className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+            Shift Notes
+          </label>
           <textarea
             rows={2}
             value={activeHandover.summaryNotes}
             onChange={(e) => updateSummaryNotes(e.target.value)}
-            placeholder="Document overall facility throughput, equipment status, staffing levels, zone capacity, pending cross-docking..."
+            placeholder="Key operational updates, bay throughput, or special instructions..."
             className="w-full px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100 leading-relaxed"
           />
         </div>
       </section>
 
-
-      {/* Main 2-Column Split: SBAR Cases (Left 65%) vs Custody & Actions (Right 35%) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: SBAR Operational Case Board (8 cols) */}
+      {/* Main Split: Cases (Left) vs Custody & Tasks (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left: SBAR Operational Cases */}
         <div className="lg:col-span-8 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-            <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <ClipboardCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                Structured SBAR Case & Asset Ledger
+            <div className="flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+              <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                Operational Cases ({filteredCases.length})
               </h2>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Situation · Background · Assessment · Recommendation
-              </span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -378,7 +331,7 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                       onClick={() => setAcuityFilter(filter)}
                       className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors capitalize cursor-pointer ${
                         isSelected
-                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
@@ -393,27 +346,21 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 rounded-lg cursor-pointer transition-colors shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Log Handover Case</span>
+                <span>New Case</span>
               </button>
             </div>
           </div>
 
-          {/* SBAR Case Cards List */}
+          {/* Cases List */}
           {filteredCases.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center">
-              <ClipboardCheck className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+              <ClipboardList className="w-8 h-8 text-slate-400 mx-auto mb-2" />
               <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                No cases match acuity filter "{acuityFilter}"
+                No cases found
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Log a new SBAR operational record or select 'all' to inspect all active floor cases.
+                No active operational cases match this filter.
               </p>
-              <button
-                onClick={onOpenNewCase}
-                className="mt-4 px-4 py-2 text-xs font-semibold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 rounded-lg hover:bg-teal-100 dark:hover:bg-teal-900/60 cursor-pointer"
-              >
-                Log First SBAR Case
-              </button>
             </div>
           ) : (
             filteredCases.map((c) => {
@@ -421,141 +368,116 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
               return (
                 <div
                   key={c.id}
-                  className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
+                  className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-3.5 hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
                 >
-                  {/* Card Title & Clean Unboxed Metadata */}
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-800">
+                  {/* Case Header */}
+                  <div className="flex items-start justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                           {c.subjectRef}
                         </h3>
-                        {/* Acuity Text Indicator with clean dot */}
                         <span
-                          className={`text-xs font-semibold capitalize ${
+                          className={`text-xs font-semibold capitalize px-2 py-0.5 rounded-full text-[11px] ${
                             c.acuity === 'critical'
-                              ? 'text-rose-600 dark:text-rose-400'
+                              ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
                               : c.acuity === 'unstable'
-                              ? 'text-amber-600 dark:text-amber-400'
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
                               : c.acuity === 'observation'
-                              ? 'text-blue-600 dark:text-blue-400'
-                              : 'text-emerald-600 dark:text-emerald-400'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                           }`}
                         >
-                          · {c.acuity}
+                          {c.acuity}
                         </span>
                       </div>
-
-                      <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
                         <span>{c.category}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>Updated {c.lastUpdated}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>By {c.updatedBy}</span>
+                        <span>·</span>
+                        <span>{c.lastUpdated}</span>
+                        <span>·</span>
+                        <span>{c.updatedBy}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => deleteCase(c.id)}
-                        title="Delete SBAR entry"
-                        className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => deleteCase(c.id)}
+                      title="Delete case"
+                      className="p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  {/* Hazard / Isolation Alert & Acknowledgment */}
+                  {/* Hazard Alert */}
                   {c.isolationOrHazardAlert ? (
-                    <div className="p-2.5 rounded-lg bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-800 dark:text-amber-300">
+                    <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-800 dark:text-amber-300">
                       <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                        <span className="font-semibold">Special Safety Order:</span>
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                        <span className="font-semibold">Safety Order:</span>
                         <span>{c.isolationOrHazardAlert}</span>
                       </div>
                       {!c.isolationOrHazardAlert.includes('[ACKNOWLEDGED') && (
                         <button
                           onClick={() => handleAcknowledgeHazard(c.id, c.isolationOrHazardAlert)}
-                          className="px-2.5 py-1 text-[11px] font-semibold text-amber-900 dark:text-amber-200 bg-amber-200/70 dark:bg-amber-900/50 rounded hover:bg-amber-300/80 cursor-pointer self-start sm:self-auto transition-colors"
+                          className="px-2 py-1 text-[11px] font-semibold text-amber-900 bg-amber-200 rounded hover:bg-amber-300 cursor-pointer self-start sm:self-auto"
                         >
-                          Acknowledge Safety Control
+                          Acknowledge
                         </button>
                       )}
                     </div>
                   ) : isHighRisk ? (
                     <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-rose-800 dark:text-rose-300">
                       <div className="flex items-center gap-2">
-                        <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
-                        <span className="font-semibold">High Acuity Flag:</span>
-                        <span>Requires joint incoming supervisor hazard acknowledgement.</span>
+                        <ShieldAlert className="w-4 h-4 shrink-0 text-rose-600" />
+                        <span className="font-semibold">High Acuity:</span>
+                        <span>Requires incoming supervisor acknowledgement.</span>
                       </div>
                       <button
                         onClick={() => handleAcknowledgeHazard(c.id)}
-                        className="px-2.5 py-1 text-[11px] font-semibold text-rose-900 dark:text-rose-100 bg-rose-200/80 dark:bg-rose-900/60 rounded hover:bg-rose-300 cursor-pointer self-start sm:self-auto transition-colors"
+                        className="px-2 py-1 text-[11px] font-semibold text-rose-900 bg-rose-200 rounded hover:bg-rose-300 cursor-pointer self-start sm:self-auto"
                       >
-                        Acknowledge & Clear Gate
+                        Acknowledge
                       </button>
                     </div>
                   ) : null}
 
                   {/* SBAR 4-Quadrant Matrix */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
-                    {/* Situation */}
-                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                      <div className="font-semibold text-teal-800 dark:text-teal-400 mb-1 flex items-center gap-1">
-                        <span>S · Situation</span>
-                      </div>
-                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
-                        {c.situation}
-                      </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                      <span className="font-bold text-teal-700 dark:text-teal-400 block mb-1">Situation</span>
+                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed">{c.situation}</p>
                     </div>
 
-                    {/* Background */}
-                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                      <div className="font-semibold text-slate-800 dark:text-slate-300 mb-1">
-                        <span>B · Background</span>
-                      </div>
-                      <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-                        {c.background}
-                      </p>
+                    <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                      <span className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Background</span>
+                      <p className="text-slate-600 dark:text-slate-400 leading-relaxed">{c.background}</p>
                     </div>
 
-                    {/* Assessment */}
-                    <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                      <div className="font-semibold text-slate-800 dark:text-slate-300 mb-1">
-                        <span>A · Assessment & Metrics</span>
-                      </div>
-                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed mb-2">
-                        {c.assessment}
-                      </p>
-                      {/* Metrics tabular strip */}
+                    <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                      <span className="font-bold text-slate-700 dark:text-slate-300 block mb-1">Assessment</span>
+                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed mb-1.5">{c.assessment}</p>
                       {c.vitalsOrMetrics && c.vitalsOrMetrics.length > 0 && (
-                        <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                        <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
                           {c.vitalsOrMetrics.map((v, i) => (
-                            <div
+                            <span
                               key={i}
-                              className={`text-[11px] font-mono tabular-nums px-2 py-0.5 rounded ${
+                              className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                                 v.isAbnormal
                                   ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 font-bold'
                                   : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
                               }`}
                             >
-                              <span className="opacity-75">{v.label}:</span> {v.value}
-                            </div>
+                              {v.label}: {v.value}
+                            </span>
                           ))}
                         </div>
                       )}
                     </div>
 
-                    {/* Recommendation */}
-                    <div className="p-3 rounded-lg bg-teal-50/40 dark:bg-teal-950/20 border border-teal-200/50 dark:border-teal-800/40">
-                      <div className="font-semibold text-teal-900 dark:text-teal-300 mb-1 flex items-center justify-between">
-                        <span>R · Recommendation (Action Plan)</span>
-                      </div>
-                      <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
-                        {c.recommendation}
-                      </p>
+                    <div className="p-2.5 rounded-lg bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/50 dark:border-teal-800/40">
+                      <span className="font-bold text-teal-800 dark:text-teal-300 block mb-1">Recommendation</span>
+                      <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium">{c.recommendation}</p>
                     </div>
                   </div>
                 </div>
@@ -564,34 +486,32 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
           )}
         </div>
 
-        {/* Right Column: Custody Walkthrough & Carry-Over Action Items (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Section 1: Equipment & Asset Custody Joint Walkthrough */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                  MHE & Equipment Custody
+        {/* Right: Custody & Action Items */}
+        <div className="lg:col-span-4 space-y-5">
+          {/* Equipment Custody */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-1.5">
+                <Package className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Equipment Custody
                 </h3>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {verifiedEqCount} of {totalEqCount} verified during joint walkthrough
+                <span className="text-xs font-mono text-slate-400 ml-1">
+                  ({verifiedEqCount}/{totalEqCount})
                 </span>
               </div>
               <div className="flex items-center gap-1">
                 {verifiedEqCount < totalEqCount && (
                   <button
                     onClick={handleVerifyAllEquipment}
-                    title="Verify all equipment custody items"
-                    className="px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 rounded cursor-pointer transition-colors"
+                    className="px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 rounded cursor-pointer"
                   >
                     Verify All
                   </button>
                 )}
                 <button
                   onClick={() => setShowAddEqForm(!showAddEqForm)}
-                  className="p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                  title="Add equipment asset"
+                  className="p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -606,7 +526,7 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="Asset Name (e.g. Electric Forklift #08, RF Scanner #04)"
+                  placeholder="Asset Name (e.g. Forklift #08)"
                   value={newEqName}
                   onChange={(e) => setNewEqName(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
@@ -614,7 +534,7 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <input
                     type="text"
-                    placeholder="Asset Tag (e.g. MHE-FL-08)"
+                    placeholder="Tag (e.g. MHE-FL-08)"
                     value={newEqTag}
                     onChange={(e) => setNewEqTag(e.target.value)}
                     className="px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 font-mono text-[11px]"
@@ -626,32 +546,9 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                   >
                     <option value="functional">Functional</option>
                     <option value="inspection_due">Inspection Due</option>
-                    <option value="faulty">Faulty / Maintenance</option>
-                    <option value="in_use">In Active Use</option>
+                    <option value="faulty">Faulty</option>
+                    <option value="in_use">In Use</option>
                   </select>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Battery %</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={newEqBattery}
-                      onChange={(e) => setNewEqBattery(e.target.value)}
-                      className="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 font-mono text-[11px]"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block mb-0.5">Notes</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. In Bay 04"
-                      value={newEqNotes}
-                      onChange={(e) => setNewEqNotes(e.target.value)}
-                      className="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 text-[11px]"
-                    />
-                  </div>
                 </div>
                 <div className="flex justify-end gap-2 pt-1">
                   <button
@@ -665,77 +562,63 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                     type="submit"
                     className="px-2.5 py-1 bg-teal-700 text-white rounded font-semibold cursor-pointer"
                   >
-                    Add Asset
+                    Add
                   </button>
                 </div>
               </form>
             )}
 
-            <div className="space-y-2 pt-1">
+            <div className="space-y-1.5">
               {activeHandover.equipment.map((eq) => (
                 <div
                   key={eq.id}
                   onClick={() => toggleEquipmentCustody(eq.id)}
-                  className={`p-3 rounded-lg border transition-all cursor-pointer flex items-start gap-3 ${
+                  className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-2 ${
                     eq.custodyChecked
                       ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
                       : 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 hover:border-slate-300'
                   }`}
                 >
-                  <div className="pt-0.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     {eq.custodyChecked ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     ) : (
-                      <Circle className="w-4 h-4 text-slate-400 shrink-0" />
+                      <Circle className="w-4 h-4 text-slate-300 shrink-0" />
                     )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+                    <div className="min-w-0">
+                      <span className="text-xs font-semibold text-slate-900 dark:text-white block truncate">
                         {eq.name}
                       </span>
-                      {eq.batteryPercent !== undefined && (
-                        <span className="text-[10px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                          {eq.batteryPercent}%
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-slate-500 dark:text-slate-400 mt-0.5">
-                      <span>{eq.assetTag}</span>
-                      <span aria-hidden="true">·</span>
-                      <span className="capitalize">{eq.status.replace('_', ' ')}</span>
-                      <span aria-hidden="true">·</span>
-                      <span className={eq.custodyChecked ? 'text-emerald-600 font-semibold' : 'text-amber-600'}>
-                        {eq.custodyChecked ? 'Verified' : 'Pending Check'}
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {eq.assetTag} · {eq.status.replace('_', ' ')}
                       </span>
                     </div>
-                    {eq.notes && (
-                      <p className="text-[11px] text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">
-                        {eq.notes}
-                      </p>
-                    )}
                   </div>
+                  {eq.batteryPercent !== undefined && (
+                    <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                      {eq.batteryPercent}%
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           </div>
 
-
-          {/* Section 2: Action Items & Carry-Over Queue */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                  Cross-Shift Action Queue
+          {/* Cross-Shift Actions */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-1.5">
+                <CheckSquare className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Action Queue
                 </h3>
-                <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Unresolved tasks roll over automatically
+                <span className="text-xs font-mono text-slate-400 ml-1">
+                  ({activeHandover.actions.length})
                 </span>
               </div>
               <button
                 onClick={() => setShowAddActionForm(!showAddActionForm)}
-                className="p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                className="p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -749,7 +632,7 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                 <input
                   type="text"
                   required
-                  placeholder="Task Title (e.g. Inspect hydraulic mast on Reach Truck #RT-09)"
+                  placeholder="Task title..."
                   value={newActionTitle}
                   onChange={(e) => setNewActionTitle(e.target.value)}
                   className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
@@ -761,14 +644,14 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                     className="px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
                   >
                     <option value="normal">Normal</option>
-                    <option value="high">High Priority</option>
-                    <option value="urgent">Urgent Priority</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
                   </select>
                   <input
                     type="text"
                     value={newActionDue}
                     onChange={(e) => setNewActionDue(e.target.value)}
-                    placeholder="Due (e.g. 09:30 AM)"
+                    placeholder="Due (09:00 AM)"
                     className="px-2 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 font-mono text-[11px]"
                   />
                 </div>
@@ -784,20 +667,20 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                     type="submit"
                     className="px-2.5 py-1 bg-teal-700 text-white rounded font-semibold cursor-pointer"
                   >
-                    Add Task
+                    Add
                   </button>
                 </div>
               </form>
             )}
 
-            <div className="space-y-2 pt-1">
+            <div className="space-y-1.5">
               {activeHandover.actions.map((act) => {
                 const isCompleted = act.status === 'completed';
                 return (
                   <div
                     key={act.id}
                     onClick={() => toggleTaskStatus(act.id)}
-                    className={`p-3 rounded-lg border transition-all cursor-pointer flex items-start gap-3 ${
+                    className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-start gap-2.5 ${
                       isCompleted
                         ? 'bg-slate-50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800 opacity-60'
                         : act.priority === 'urgent'
@@ -807,30 +690,25 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                   >
                     <div className="pt-0.5">
                       {isCompleted ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       ) : (
-                        <Circle className="w-4 h-4 text-slate-400 shrink-0" />
+                        <Circle className="w-4 h-4 text-slate-300 shrink-0" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p
                         className={`text-xs font-medium text-slate-900 dark:text-white leading-snug ${
-                          isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : ''
+                          isCompleted ? 'line-through text-slate-400' : ''
                         }`}
                       >
                         {act.title}
                       </p>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                        <span className="font-mono tabular-nums">{act.dueTime}</span>
-                        <span aria-hidden="true">·</span>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                        <span className="font-mono">{act.dueTime}</span>
+                        <span>·</span>
                         <span>{act.assignedTo}</span>
                         {act.carriedOverFromPrevious && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span className="text-amber-600 dark:text-amber-400 font-semibold">
-                              Rolled Over
-                            </span>
-                          </>
+                          <span className="text-amber-600 font-semibold">· Rolled Over</span>
                         )}
                       </div>
                     </div>
