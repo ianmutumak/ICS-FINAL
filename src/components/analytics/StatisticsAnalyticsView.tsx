@@ -174,84 +174,68 @@ export const StatisticsAnalyticsView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Operational Analytics Status Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-lg bg-teal-50/70 dark:bg-slate-800/80 border border-teal-200/60 dark:border-slate-700/60 text-xs">
-        <div className="flex items-center gap-2">
-          <Award className="w-4 h-4 text-teal-700 dark:text-teal-400 shrink-0" />
-          <span className="text-slate-800 dark:text-slate-200 font-medium">
-            <strong className="text-teal-900 dark:text-teal-300 font-semibold">Operational QA & Governance</strong> · Transition Efficiency & Usability Metrics
-          </span>
-        </div>
-        <div className="text-[11px] font-mono text-teal-700 dark:text-teal-300">
-          Standardized System Usability Scale (SUS) Benchmarks
-        </div>
-      </div>
 
       {/* Header */}
-      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs">
+      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-mono text-teal-700 dark:text-teal-400 font-semibold">
-                Operational Governance & QA
+                Governance & QA
               </span>
-              <span aria-hidden="true">·</span>
-              <span>Turnover Duration Benchmarks</span>
-              <span aria-hidden="true">·</span>
-              <span>Non-Repudiation Compliance</span>
-              <span aria-hidden="true">·</span>
-              <span>Supervisor Usability Debrief</span>
+              <span>·</span>
+              <span>Shift Telemetry</span>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Handover Statistics & Usability Debrief
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Operational Analytics
             </h1>
-            <p className="text-xs text-slate-600 dark:text-slate-400 max-w-3xl leading-relaxed">
-              Real-time shift turnover cycle telemetry, task carry-over velocity, dual sign-off compliance, and standardized System Usability Scale (SUS) debrief evaluations.
-            </p>
           </div>
 
-          {/* Sub-tab switcher */}
+          {/* Sub-tab switcher with icons */}
           <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs">
             <button
               onClick={() => setActiveAnalyticsTab('overview')}
-              className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
                 activeAnalyticsTab === 'overview'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
-              Turnover Metrics
+              <Clock className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span>Metrics</span>
             </button>
             <button
               onClick={() => setActiveAnalyticsTab('attendance')}
-              className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
                 activeAnalyticsTab === 'attendance'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
-              Staff Attendance ({attendanceLogs.length})
+              <Users className="w-3.5 h-3.5 text-blue-500" />
+              <span>Attendance ({attendanceLogs.length})</span>
             </button>
             <button
               onClick={() => setActiveAnalyticsTab('compliance')}
-              className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
+              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
                 activeAnalyticsTab === 'compliance'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
-              Sign-Off Audits ({complianceRecords.length})
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Audits ({complianceRecords.length})</span>
             </button>
             <button
               onClick={() => setActiveAnalyticsTab('sus-debrief')}
-              className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
                 activeAnalyticsTab === 'sus-debrief'
-                  ? 'bg-teal-700 text-white shadow-xs dark:bg-teal-600'
+                  ? 'bg-teal-700 text-white shadow-xs dark:bg-teal-600 font-semibold'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-              <span>Supervisor SUS Debrief ({susEvaluations.length})</span>
+              <FileCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>Usability ({susEvaluations.length})</span>
             </button>
           </div>
         </div>

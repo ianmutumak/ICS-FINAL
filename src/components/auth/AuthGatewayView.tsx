@@ -7,6 +7,12 @@ import {
   LogIn,
   AlertCircle,
   Sparkles,
+  User,
+  ShieldCheck,
+  Building2,
+  Briefcase,
+  Award,
+  Hash,
 } from 'lucide-react';
 import { loginWithGoogle } from '../../lib/firebase';
 
@@ -35,7 +41,7 @@ export const AuthGatewayView: React.FC = () => {
     e.preventDefault();
     setErrorMessage('');
     if (staffNumberInput.trim().length === 0) {
-      setErrorMessage('Please enter your Worker ID / Badge Number.');
+      setErrorMessage('Please enter your Badge ID.');
       return;
     }
     if (pinInput.trim().length < 4) {
@@ -48,7 +54,7 @@ export const AuthGatewayView: React.FC = () => {
       enableAdminClearance ? adminPasskeyInput.trim() : undefined
     );
     if (!res.success) {
-      setErrorMessage(res.error || 'Authentication failed. Please verify worker ID and PIN.');
+      setErrorMessage(res.error || 'Authentication failed. Please verify credentials.');
     }
   };
 
@@ -56,15 +62,15 @@ export const AuthGatewayView: React.FC = () => {
     e.preventDefault();
     setErrorMessage('');
     if (!fullName.trim() || !newStaffNumber.trim()) {
-      setErrorMessage('Please fill in all required fields.');
+      setErrorMessage('Please fill in required fields.');
       return;
     }
     if (newStaffNumber.trim().length < 4) {
-      setErrorMessage('Badge / Worker ID must be at least 4 characters.');
+      setErrorMessage('Badge ID must be at least 4 characters.');
       return;
     }
     if (newPin.trim().length < 4) {
-      setErrorMessage('Security PIN must be at least 4 digits.');
+      setErrorMessage('PIN must be at least 4 digits.');
       return;
     }
 
@@ -104,63 +110,61 @@ export const AuthGatewayView: React.FC = () => {
   const handleGoogleSignIn = async () => {
     try {
       await loginWithGoogle();
-      // On success, sign in as authorized supervisor
       signInUser('KQ-SUP-8841', '1234', MASTER_ADMIN_PASSKEY);
     } catch (err) {
-      console.warn('Google Auth popup notice:', err);
+      console.warn('Google Auth notice:', err);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center items-center px-4 py-12 relative overflow-hidden select-none">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center items-center px-4 py-10 relative overflow-hidden select-none">
       {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-80 h-80 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-md w-full relative z-10 space-y-6">
-        {/* Brand Lockup */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex p-3 rounded-2xl bg-teal-950/80 border border-teal-800/80 text-teal-400 shadow-xl mb-1">
-            <ZamuLogoIcon className="w-10 h-10" />
+      <div className="max-w-md w-full relative z-10 space-y-5">
+        {/* Brand */}
+        <div className="text-center space-y-1.5">
+          <div className="inline-flex p-2.5 rounded-2xl bg-teal-950/80 border border-teal-800/80 text-teal-400 shadow-xl mb-1">
+            <ZamuLogoIcon className="w-9 h-9" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white font-sans">
             ZAMU-CHECK
           </h1>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
-            Kenya Airways Cargo · Bonded Freight & Warehouse Shift Turnover System
+          <p className="text-xs text-slate-400">
+            Kenya Airways Cargo · Shift Turnover & Governance
           </p>
         </div>
 
         {/* Portal Card */}
-        <div className="bg-slate-950/90 rounded-2xl border border-slate-800 shadow-2xl p-6 backdrop-blur-xl space-y-5">
+        <div className="bg-slate-950/90 rounded-2xl border border-slate-800 shadow-2xl p-5 sm:p-6 backdrop-blur-xl space-y-4">
           {/* Mode Switcher Tabs */}
           <div className="flex items-center gap-1 p-1 bg-slate-900 rounded-xl text-xs">
             <button
               type="button"
               onClick={() => { setAuthMode('signin'); setErrorMessage(''); }}
-              className={`flex-1 py-2 rounded-lg font-medium transition-all text-center cursor-pointer ${
+              className={`flex-1 py-1.5 rounded-lg font-medium transition-all text-center cursor-pointer ${
                 authMode === 'signin'
                   ? 'bg-slate-800 text-white shadow-xs font-semibold'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Worker Sign In
+              Sign In
             </button>
             <button
               type="button"
               onClick={() => { setAuthMode('signup'); setErrorMessage(''); }}
-              className={`flex-1 py-2 rounded-lg font-medium transition-all text-center cursor-pointer ${
+              className={`flex-1 py-1.5 rounded-lg font-medium transition-all text-center cursor-pointer ${
                 authMode === 'signup'
                   ? 'bg-slate-800 text-white shadow-xs font-semibold'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Onboard Worker
+              Register
             </button>
           </div>
 
           {errorMessage && (
-            <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-900/80 text-xs text-rose-300 flex items-start gap-2">
+            <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-900/80 text-xs text-rose-300 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
               <span>{errorMessage}</span>
             </div>
@@ -168,24 +172,26 @@ export const AuthGatewayView: React.FC = () => {
 
           {/* Mode 1: Sign In */}
           {authMode === 'signin' && (
-            <form onSubmit={handleSignIn} className="space-y-4 text-xs">
+            <form onSubmit={handleSignIn} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Worker ID / Badge Number
+                <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <Hash className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Badge ID</span>
                 </label>
                 <input
                   type="text"
                   required
                   value={staffNumberInput}
                   onChange={(e) => setStaffNumberInput(e.target.value)}
-                  placeholder="e.g. KQ-OPS-9204"
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder="KQ-OPS-9204"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Security PIN / Terminal Key
+                <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Security PIN</span>
                 </label>
                 <input
                   type="password"
@@ -195,13 +201,13 @@ export const AuthGatewayView: React.FC = () => {
                   maxLength={6}
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value)}
-                  placeholder="Enter 4-digit PIN"
-                  className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder="4-digit PIN"
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
 
-              {/* Secret Admin Clearance Checkbox */}
-              <div className="pt-1">
+              {/* Supervisor Clearance */}
+              <div>
                 <label className="flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-200">
                   <input
                     type="checkbox"
@@ -209,24 +215,20 @@ export const AuthGatewayView: React.FC = () => {
                     onChange={(e) => setEnableAdminClearance(e.target.checked)}
                     className="rounded border-slate-700 text-teal-600 focus:ring-teal-500 cursor-pointer"
                   />
-                  <span className="text-[11px] font-medium flex items-center gap-1.5">
-                    <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-                    Authorize with Supervisor Security Passkey
+                  <span className="text-[11px] font-medium flex items-center gap-1">
+                    <KeyRound className="w-3 h-3 text-amber-400" />
+                    Supervisor Clearance Passkey
                   </span>
                 </label>
 
                 {enableAdminClearance && (
-                  <div className="mt-2.5 p-3 rounded-xl bg-slate-900/80 border border-amber-900/50 space-y-1.5 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between text-[11px] text-amber-300 font-semibold">
-                      <span>Supervisor Clearance Key *</span>
-                      <span className="font-mono text-[10px] text-slate-400">Hint: Contact your supervisor</span>
-                    </div>
+                  <div className="mt-2 p-2.5 rounded-xl bg-slate-900/80 border border-amber-900/50 space-y-1">
                     <input
                       type="password"
                       value={adminPasskeyInput}
                       onChange={(e) => setAdminPasskeyInput(e.target.value)}
-                      placeholder="Enter Master Admin Passkey"
-                      className="w-full px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder="Supervisor Passkey"
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
                   </div>
                 )}
@@ -234,20 +236,21 @@ export const AuthGatewayView: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors cursor-pointer shadow-lg text-sm mt-2 flex items-center justify-center gap-2"
+                className="w-full py-2.5 px-4 font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors cursor-pointer shadow-lg text-xs mt-1 flex items-center justify-center gap-2"
               >
                 <LogIn className="w-4 h-4" />
-                <span>Verify Credentials & Sign In</span>
+                <span>Sign In</span>
               </button>
             </form>
           )}
 
           {/* Mode 2: Sign Up */}
           {authMode === 'signup' && (
-            <form onSubmit={handleSignUp} className="space-y-3.5 text-xs">
+            <form onSubmit={handleSignUp} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Full Worker / Operator Name *
+                <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Full Name *</span>
                 </label>
                 <input
                   type="text"
@@ -255,14 +258,15 @@ export const AuthGatewayView: React.FC = () => {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="e.g. David Kiprop"
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Badge / Worker ID *
+                  <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1">
+                    <Hash className="w-3 h-3 text-slate-400" />
+                    <span>Badge ID *</span>
                   </label>
                   <input
                     type="text"
@@ -270,12 +274,13 @@ export const AuthGatewayView: React.FC = () => {
                     value={newStaffNumber}
                     onChange={(e) => setNewStaffNumber(e.target.value)}
                     placeholder="KQ-OPS-2051"
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Security PIN (4 Digits) *
+                  <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-slate-400" />
+                    <span>PIN (4 Digits) *</span>
                   </label>
                   <input
                     type="password"
@@ -285,20 +290,21 @@ export const AuthGatewayView: React.FC = () => {
                     maxLength={6}
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value)}
-                    placeholder="Set 4-6 digit PIN"
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
+                    placeholder="4-digit PIN"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Assigned Operational Zone / Bay
+                <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Operational Zone</span>
                 </label>
                 <select
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                  className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
                 >
                   {departments.map((d) => (
                     <option key={d.id} value={d.name}>
@@ -310,97 +316,105 @@ export const AuthGatewayView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Operational Role
+                  <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1">
+                    <Briefcase className="w-3 h-3 text-slate-400" />
+                    <span>Role</span>
                   </label>
                   <input
                     type="text"
                     value={role}
                     onChange={(e) => setRole(e.target.value)}
-                    placeholder="e.g. MHE Lead / Shift Lead"
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                    placeholder="Operations Lead"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Certifications
+                  <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1">
+                    <Award className="w-3 h-3 text-slate-400" />
+                    <span>Certification</span>
                   </label>
                   <input
                     type="text"
                     value={qualification}
                     onChange={(e) => setQualification(e.target.value)}
-                    placeholder="e.g. OSHA 30 / VNA Cert"
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white"
+                    placeholder="IATA Cargo"
+                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-400 font-medium mb-1">
-                  Supervisor Clearance Passkey (Optional)
+                <label className="text-slate-400 font-medium mb-1 flex items-center gap-1">
+                  <KeyRound className="w-3 h-3 text-amber-400" />
+                  <span>Supervisor Passkey (Optional)</span>
                 </label>
                 <input
                   type="password"
                   value={signupAdminPasskey}
                   onChange={(e) => setSignupAdminPasskey(e.target.value)}
-                  placeholder="Enter authorization passkey"
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
+                  placeholder="Clearance passkey"
+                  className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors cursor-pointer shadow-lg text-sm mt-2"
+                className="w-full py-2.5 px-4 font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors cursor-pointer shadow-lg text-xs mt-1"
               >
-                Register Operational Staff
+                Register Account
               </button>
             </form>
           )}
 
-          {/* Quick Access Operational Profiles */}
-          <div className="pt-3 border-t border-slate-800/80 space-y-2">
+          {/* Quick Access Profiles */}
+          <div className="pt-2.5 border-t border-slate-800/80 space-y-1.5">
             <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block text-center">
-              Active Institutional Profiles
+              Quick Test Profiles
             </span>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={autofillStaff}
-                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition-colors cursor-pointer"
+                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition-colors cursor-pointer flex items-center gap-2"
               >
-                <span className="text-[11px] font-semibold text-slate-200 block truncate">
-                  Ramp Marshall
-                </span>
-                <span className="text-[9px] text-slate-400 font-mono block">
-                  David Kiprop (KQ-OPS-9204)
-                </span>
+                <User className="w-4 h-4 text-teal-400 shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-[11px] font-semibold text-slate-200 block truncate">
+                    Ramp Lead
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-mono block truncate">
+                    KQ-OPS-9204
+                  </span>
+                </div>
               </button>
 
               <button
                 type="button"
                 onClick={autofillAdmin}
-                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-amber-900/60 text-left transition-colors cursor-pointer"
+                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-amber-900/60 text-left transition-colors cursor-pointer flex items-center gap-2"
               >
-                <span className="text-[11px] font-semibold text-amber-300 block truncate flex items-center gap-1">
-                  <Lock className="w-2.5 h-2.5 text-amber-400" />
-                  Cargo Duty Supervisor
-                </span>
-                <span className="text-[9px] text-slate-400 font-mono block">
-                  Mary Wanjiku (KQ-SUP-8841)
-                </span>
+                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-[11px] font-semibold text-amber-300 block truncate">
+                    Supervisor
+                  </span>
+                  <span className="text-[9px] text-slate-400 font-mono block truncate">
+                    KQ-SUP-8841
+                  </span>
+                </div>
               </button>
             </div>
           </div>
 
           {/* Google Sign In option */}
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="button"
               onClick={handleGoogleSignIn}
               className="w-full py-2 px-3 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-300 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-              <span>Continue with Google Sign-In</span>
+              <span>Google Sign-In</span>
             </button>
           </div>
         </div>
