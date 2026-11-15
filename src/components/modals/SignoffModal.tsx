@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useHandover } from '../../context/HandoverContext';
 import { DualSignoffStampIcon, CustodyShieldIcon } from '../common/CustomSvgIcons';
 import { X, CheckCircle, ShieldAlert, KeyRound, Archive, ArrowRight } from 'lucide-react';
@@ -8,22 +8,70 @@ interface SignoffModalProps {
   onClose: () => void;
 }
 
+interface SignatureCardProps {
+  label: string;
+  statement: string;
+  signedBadge: string;
+  confirmed: boolean;
+  signerName?: string;
+  signedAt?: string;
+  // Shown until the signature is recorded: a sign button or the reason signing is not available.
+  pending: React.ReactNode;
+}
+
+const SignatureCard: React.FC<SignatureCardProps> = ({
+  label,
+  statement,
+  signedBadge,
+  confirmed,
+  signerName,
+  signedAt,
+  pending,
+}) => (
+  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
+    <div className="pb-2 border-b border-slate-200 dark:border-slate-700/60">
+      <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 dark:text-slate-400 block">
+        {label}
+      </span>
+      <span className="text-sm font-semibold text-slate-900 dark:text-white">
+        {confirmed ? signerName : 'Waiting for signature'}
+      </span>
+    </div>
+
+    <p className="text-xs text-slate-600 dark:text-slate-400 mt-2.5 leading-relaxed">{statement}</p>
+
+    {confirmed ? (
+      <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <div>
+            <span className="font-semibold block">{signerName}</span>
+            {signedAt && (
+              <span className="text-[10px] font-mono opacity-80">
+                Signed: {new Date(signedAt).toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+        </div>
+        <span className="text-[10px] font-mono uppercase bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded">
+          {signedBadge}
+        </span>
+      </div>
+    ) : (
+      <div className="mt-4">{pending}</div>
+    )}
+  </div>
+);
+
 export const SignoffModal: React.FC<SignoffModalProps> = ({ isOpen, onClose }) => {
   const {
     activeHandover,
+    currentUser,
+    hasAdminClearance,
     signOutgoingLead,
     signIncomingLead,
     completeAndArchiveShift,
   } = useHandover();
-
-  const [outgoingInput, setOutgoingInput] = useState(
-    activeHandover.signoff.outgoingSignatureText || activeHandover.leadOutgoing.name
-  );
-  const [incomingInput, setIncomingInput] = useState(
-    activeHandover.signoff.incomingSignatureText || activeHandover.leadIncoming.name
-  );
-
-  const [showArchivedNotice, setShowArchivedNotice] = useState(false);
 
   if (!isOpen) return null;
 
@@ -31,33 +79,54 @@ export const SignoffModal: React.FC<SignoffModalProps> = ({ isOpen, onClose }) =
   const unverifiedEquipment = equipment.filter((e) => !e.custodyChecked);
   const pendingActions = actions.filter((a) => a.status === 'pending' || a.status === 'in_progress');
   const isFullySigned = signoff.outgoingConfirmed && signoff.incomingConfirmed;
+  // A signature is the signed-in account, so the same account cannot hand over to itself.
+  const signedOutgoingAsCurrentUser = signoff.outgoingConfirmed && signoff.outgoingStaffId === currentUser.id;
 
-  const handleOutgoingSign = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (outgoingInput.trim()) {
-      signOutgoingLead(outgoingInput.trim());
-    }
-  };
-
-  const handleIncomingSign = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (incomingInput.trim()) {
-      signIncomingLead(incomingInput.trim());
-    }
-  };
-
-  const handleArchiveAndRoll = () => {
+  const handleApprove = () => {
     completeAndArchiveShift();
-    setShowArchivedNotice(true);
-    setTimeout(() => {
-      setShowArchivedNotice(false);
-      onClose();
-    }, 1400);
+    onClose();
   };
+
+  const noteClass = 'text-xs leading-relaxed text-slate-500 dark:text-slate-400';
+
+  const outgoingPending = hasAdminClearance ? (
+    <p className={noteClass}>Waiting for the outgoing staff member to sign.</p>
+  ) : (
+    <button
+      type="button"
+      onClick={signOutgoingLead}
+      className="w-full py-2 px-3 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors"
+    >
+      Sign as {currentUser.name}
+    </button>
+  );
+
+  let incomingPending: React.ReactNode;
+  if (!signoff.outgoingConfirmed) {
+    incomingPending = <p className={noteClass}>The outgoing staff member signs first.</p>;
+  } else if (hasAdminClearance) {
+    incomingPending = <p className={noteClass}>Waiting for the incoming staff member to sign.</p>;
+  } else if (signedOutgoingAsCurrentUser) {
+    incomingPending = (
+      <p className={noteClass}>
+        You signed as the outgoing staff member. The staff member taking over must sign in with their own account to accept this handover.
+      </p>
+    );
+  } else {
+    incomingPending = (
+      <button
+        type="button"
+        onClick={signIncomingLead}
+        className="w-full py-2 px-3 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 rounded-lg cursor-pointer transition-colors"
+      >
+        Sign as {currentUser.name}
+      </button>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/65 backdrop-blur-xs">
-      <div className="bg-white dark:bg-slate-900 rounded-xl max-w-2xl w-full max-h-[92vh] overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl p-6 transition-all">
+      <div role="dialog" aria-modal="true" aria-labelledby="signoff-title" className="bg-white dark:bg-slate-900 rounded-xl max-w-2xl w-full max-h-[92vh] overflow-y-auto border border-slate-200 dark:border-slate-800 shadow-2xl p-6 transition-all">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -65,19 +134,17 @@ export const SignoffModal: React.FC<SignoffModalProps> = ({ isOpen, onClose }) =
               <DualSignoffStampIcon className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                Dual-Party Shift Attestation & Verification
+              <h2 id="signoff-title" className="text-base font-bold text-slate-900 dark:text-white">
+                Review and sign the handover
               </h2>
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                Non-repudiation operational governance protocol · Handover Code:{' '}
-                <span className="font-mono text-slate-700 dark:text-slate-300">
-                  {activeHandover.handoverCode}
-                </span>
+                Both staff members sign with their own accounts before an administrator approves the handover.
               </span>
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -107,128 +174,34 @@ export const SignoffModal: React.FC<SignoffModalProps> = ({ isOpen, onClose }) =
 
         {/* Dual Sign-off Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
-          {/* Outgoing Lead Card */}
-          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700/60">
-              <div>
-                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 dark:text-slate-400 block">
-                  Outgoing Team Lead
-                </span>
-                <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {activeHandover.leadOutgoing.name}
-                </span>
-              </div>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {activeHandover.leadOutgoing.role}
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-2.5 leading-relaxed">
-              "I confirm that this handover record represents an accurate, complete summary of all operational states, critical incidents, and equipment custody under my watch."
-            </p>
-
-            {signoff.outgoingConfirmed ? (
-              <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <div>
-                    <span className="font-semibold block">{signoff.outgoingSignatureText}</span>
-                    <span className="text-[10px] font-mono opacity-80">
-                      Signed: {new Date(signoff.outgoingSignedAt || '').toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono uppercase bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded">
-                  Verified
-                </span>
-              </div>
-            ) : (
-              <form onSubmit={handleOutgoingSign} className="mt-4 space-y-2">
-                <input
-                  type="text"
-                  required
-                  value={outgoingInput}
-                  onChange={(e) => setOutgoingInput(e.target.value)}
-                  placeholder="Type Full Name & Credentials"
-                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
-                />
-                <button
-                  type="submit"
-                  className="w-full py-2 px-3 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg cursor-pointer transition-colors"
-                >
-                  Confirm & Sign as Outgoing
-                </button>
-              </form>
-            )}
-          </div>
-
-          {/* Incoming Lead Card */}
-          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700/60">
-              <div>
-                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 dark:text-slate-400 block">
-                  Incoming Team Lead
-                </span>
-                <span className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {activeHandover.leadIncoming.name}
-                </span>
-              </div>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                {activeHandover.leadIncoming.role}
-              </span>
-            </div>
-
-            <p className="text-xs text-slate-600 dark:text-slate-400 mt-2.5 leading-relaxed">
-              "I have received the verbal and digital shift briefing, reviewed all high-acuity cases, inspected verified custody items, and formally assume operational responsibility."
-            </p>
-
-            {signoff.incomingConfirmed ? (
-              <div className="mt-4 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <div>
-                    <span className="font-semibold block">{signoff.incomingSignatureText}</span>
-                    <span className="text-[10px] font-mono opacity-80">
-                      Signed: {new Date(signoff.incomingSignedAt || '').toLocaleTimeString()}
-                    </span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono uppercase bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded">
-                  Accepted
-                </span>
-              </div>
-            ) : (
-              <form onSubmit={handleIncomingSign} className="mt-4 space-y-2">
-                <input
-                  type="text"
-                  required
-                  value={incomingInput}
-                  onChange={(e) => setIncomingInput(e.target.value)}
-                  placeholder="Type Full Name & Credentials"
-                  className="w-full px-3 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-slate-900 dark:text-slate-100"
-                />
-                <button
-                  type="submit"
-                  className="w-full py-2 px-3 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 rounded-lg cursor-pointer transition-colors"
-                >
-                  Confirm & Assume Responsibility
-                </button>
-              </form>
-            )}
-          </div>
+          <SignatureCard
+            label="Outgoing staff member"
+            statement="I have checked the updates and am handing over this shift."
+            signedBadge="Signed"
+            confirmed={signoff.outgoingConfirmed}
+            signerName={signoff.outgoingSignatureText || signoff.outgoingStaffName}
+            signedAt={signoff.outgoingSignedAt}
+            pending={outgoingPending}
+          />
+          <SignatureCard
+            label="Incoming staff member"
+            statement="I have reviewed the updates and am taking over this shift."
+            signedBadge="Accepted"
+            confirmed={signoff.incomingConfirmed}
+            signerName={signoff.incomingSignatureText || signoff.incomingStaffName}
+            signedAt={signoff.incomingSignedAt}
+            pending={incomingPending}
+          />
         </div>
 
-        {/* Cryptographic Tamper-Evident Hash */}
+        {/* Handover approval state */}
         {isFullySigned && (
           <div className="mt-4 p-3.5 rounded-xl border border-emerald-300 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/30">
             <div className="flex items-center gap-2 text-xs font-semibold text-emerald-900 dark:text-emerald-300">
               <CustodyShieldIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Dual Attestation Hash Generated (SHA-256 Non-Repudiation Seal)</span>
+              <span>Outgoing and incoming staff signatures recorded</span>
             </div>
-            <div className="mt-1 font-mono text-[11px] text-emerald-800 dark:text-emerald-400 break-all select-all bg-white/70 dark:bg-slate-900/60 p-2 rounded-md border border-emerald-200 dark:border-emerald-900">
-              {signoff.verificationHash ||
-                'SHA256:7e98a03f441b89efc11a03049182bbcca94017f8a32b694e91244e8c'}
-            </div>
+            {signoff.verificationHash && <div className="mt-1 font-mono text-[11px] text-emerald-800 dark:text-emerald-400 break-all">{signoff.verificationHash}</div>}
           </div>
         )}
 
@@ -236,7 +209,7 @@ export const SignoffModal: React.FC<SignoffModalProps> = ({ isOpen, onClose }) =
         <div className="flex items-center justify-between gap-3 pt-5 mt-5 border-t border-slate-200 dark:border-slate-800">
           <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
             <KeyRound className="w-3.5 h-3.5" />
-            <span>Audit trail compliant with Operational Governance standards</span>
+            <span>Shift approval is recorded after administrator review</span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -247,16 +220,18 @@ export const SignoffModal: React.FC<SignoffModalProps> = ({ isOpen, onClose }) =
             >
               Close
             </button>
-            {isFullySigned && (
+            {isFullySigned && hasAdminClearance && (
               <button
                 type="button"
-                onClick={handleArchiveAndRoll}
-                disabled={showArchivedNotice}
+                onClick={handleApprove}
                 className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white rounded-lg shadow-sm cursor-pointer transition-colors"
               >
                 <Archive className="w-3.5 h-3.5" />
-                {showArchivedNotice ? 'Archiving...' : 'Seal & Begin Next Shift'}
+                Approve and start next shift
               </button>
+            )}
+            {isFullySigned && !hasAdminClearance && (
+              <span className="text-xs text-amber-700 dark:text-amber-300">Both staff signatures recorded. Awaiting administrator approval.</span>
             )}
           </div>
         </div>

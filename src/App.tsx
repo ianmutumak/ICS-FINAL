@@ -1,24 +1,17 @@
 import React, { useState } from 'react';
 import { HandoverProvider, useHandover } from './context/HandoverContext';
 import { Header } from './components/layout/Header';
-import { RosterRotationView } from './components/roster/RosterRotationView';
 import { ActiveHandoverView } from './components/dashboard/ActiveHandoverView';
-import { TaskManagerView } from './components/tasks/TaskManagerView';
 import { StatisticsAnalyticsView } from './components/analytics/StatisticsAnalyticsView';
-import { ArchiveView } from './components/dashboard/ArchiveView';
 import { AdminConsoleView } from './components/admin/AdminConsoleView';
 import { AuthGatewayView } from './components/auth/AuthGatewayView';
-import { AuthModal } from './components/auth/AuthModal';
 import { NewCaseModal } from './components/modals/NewCaseModal';
 import { SignoffModal } from './components/modals/SignoffModal';
-import { PersonalizationDrawer } from './components/customization/PersonalizationDrawer';
 import { NewShiftModal } from './components/modals/NewShiftModal';
 
 function AppContent() {
   const { activeTab, isAuthenticated, hasAdminClearance, currentUser } = useHandover();
 
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isPersonalizationOpen, setIsPersonalizationOpen] = useState(false);
   const [isSignoffOpen, setIsSignoffOpen] = useState(false);
   const [isNewCaseOpen, setIsNewCaseOpen] = useState(false);
   const [isNewShiftOpen, setIsNewShiftOpen] = useState(false);
@@ -31,35 +24,19 @@ function AppContent() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
       {/* Top Bar Header adhering strictly to Top Bar Contract */}
-      <Header
-        onOpenPersonalization={() => setIsPersonalizationOpen(true)}
-        onOpenSignoff={() => setIsSignoffOpen(true)}
-        onOpenAuthModal={() => setIsAuthModalOpen(true)}
-      />
+      <Header />
 
       {/* Main Viewport Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'roster' && (
-          <RosterRotationView
-            onOpenNewShift={() => setIsNewShiftOpen(true)}
-            onOpenAuthModal={() => setIsAuthModalOpen(true)}
-          />
-        )}
-
         {activeTab === 'active-handover' && (
           <ActiveHandoverView
             onOpenNewCase={() => setIsNewCaseOpen(true)}
             onOpenSignoff={() => setIsSignoffOpen(true)}
+            onOpenNewShift={() => setIsNewShiftOpen(true)}
           />
         )}
 
-        {activeTab === 'tasks' && <TaskManagerView />}
-
-        {activeTab === 'analytics' && <StatisticsAnalyticsView />}
-
-        {activeTab === 'archive' && (
-          <ArchiveView onStartNewShiftClick={() => setIsNewShiftOpen(true)} />
-        )}
+        {activeTab === 'analytics' && hasAdminClearance && <StatisticsAnalyticsView />}
 
         {activeTab === 'admin' && hasAdminClearance && currentUser.isAdmin && (
           <AdminConsoleView />
@@ -72,27 +49,19 @@ function AppContent() {
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-700 dark:text-slate-300">ZAMU-CHECK</span>
             <span aria-hidden="true">·</span>
-            <span>Kenya Airways Cargo & Freight Hub · Shift Turnover System</span>
+            <span>Shift Handover System</span>
           </div>
-          <div className="text-[11px] font-mono text-slate-400">
-            <span>Non-Repudiation SBAR Protocol Ledger</span>
-          </div>
+          <span className="text-[11px] text-slate-400">Shift records and SBAR handovers</span>
         </div>
       </footer>
 
       {/* Modals and Drawers */}
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
-
       <NewCaseModal isOpen={isNewCaseOpen} onClose={() => setIsNewCaseOpen(false)} />
 
       <SignoffModal isOpen={isSignoffOpen} onClose={() => setIsSignoffOpen(false)} />
 
-      <PersonalizationDrawer
-        isOpen={isPersonalizationOpen}
-        onClose={() => setIsPersonalizationOpen(false)}
-      />
-
       <NewShiftModal isOpen={isNewShiftOpen} onClose={() => setIsNewShiftOpen(false)} />
+
     </div>
   );
 }

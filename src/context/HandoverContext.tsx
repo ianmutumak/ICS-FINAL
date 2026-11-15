@@ -22,11 +22,11 @@ import {
   SEED_DEPARTMENTS,
   SEED_TASKS,
   SEED_ATTENDANCE_LOGS,
-  SEED_COMPLIANCE_RECORDS,
   SEED_INCIDENTS,
   SEED_OVERRIDE_LOGS,
   SEED_CATEGORIES,
   SEED_SUS_EVALUATIONS,
+  UNASSIGNED_STAFF,
 } from '../data/seedData';
 import {
   saveShiftToFirestore,
@@ -44,6 +44,53 @@ import {
 export type NavigationTab = 'roster' | 'active-handover' | 'tasks' | 'analytics' | 'archive' | 'admin';
 
 export const MASTER_ADMIN_PASSKEY = 'ZAMU-ADMIN-2026';
+
+const SHIFT_WINDOWS: Record<ShiftType, string> = {
+  morning: '07:00 - 15:30',
+  evening: '15:00 - 23:30',
+  night: '23:00 - 07:30',
+};
+
+const NEXT_SHIFT: Record<ShiftType, ShiftType> = {
+  morning: 'evening',
+  evening: 'night',
+  night: 'morning',
+};
+
+function makeHandoverCode(shiftType: ShiftType): string {
+  return `ZAMU-${new Date().getFullYear()}-${shiftType.toUpperCase().slice(0, 3)}-${Math.floor(Math.random() * 900 + 100)}`;
+}
+
+// Calendar date in the device's own time zone (toISOString alone would give the UTC date).
+function localDateString(date = new Date()): string {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+// Whole minutes between two ISO timestamps. 0 means the duration could not be measured.
+function minutesBetween(fromIso: string, toIso: string): number {
+  const ms = new Date(toIso).getTime() - new Date(fromIso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return 0;
+  return Math.max(1, Math.ceil(ms / 60000));
+}
+
+const formatTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+// Staff details that are safe to embed in shared records. The PIN stays in the staff list.
+function toPublicStaff(staff: UserStaff): UserStaff {
+  const { pin: _pin, ...publicFields } = staff;
+  return publicFields;
+}
+
+const isClosedShift = (shift: HandoverRecord) => shift.status === 'completed' || shift.status === 'archived';
+
+function readStored<T>(key: string): T | null {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? (JSON.parse(stored) as T) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function calculateHEI(shift: HandoverRecord): HandoverEffectivenessIndex {
   const totalCases = shift.cases.length;
@@ -161,8 +208,8 @@ interface HandoverContextType {
   addEquipmentItem: (item: Omit<EquipmentItem, 'id' | 'custodyChecked'>) => void;
   
   // Sign-off
-  signOutgoingLead: (signatureName: string) => void;
-  signIncomingLead: (signatureName: string) => void;
+  signOutgoingLead: () => void;
+  signIncomingLead: () => void;
   completeAndArchiveShift: () => void;
   startNewShift: (shiftType: ShiftType, wardName: string) => void;
   
@@ -211,17 +258,18 @@ const STORAGE_AUTH_KEY = 'zamu_is_authenticated_v7';
 const STORAGE_CLEARANCE_KEY = 'zamu_admin_clearance_v7';
 const STORAGE_CATEGORIES_KEY = 'zamu_categories_v7';
 const STORAGE_SUS_KEY = 'zamu_sus_evaluations_v7';
+const STORAGE_ARCHIVE_KEY = 'zamu_archive_v7';
 
 
 export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [activeTab, setActiveTab] = useState<NavigationTab>('roster');
+  const [activeTab, setActiveTab] = useState<NavigationTab>('active-handover');
   const [dbSyncStatus, setDbSyncStatus] = useState<SyncState>('synced');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   const [staffList, setStaffList] = useState<UserStaff[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_STAFF_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) return JSON.parse(stored) as UserStaff[];
     } catch {
       // ignore
     }
@@ -231,49 +279,41 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [currentUser, setCurrentUser] = useState<UserStaff>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_USER_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) return JSON.parse(stored) as UserStaff;
     } catch {
       // ignore
     }
     return SEED_STAFF[0];
   });
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_AUTH_KEY);
-      if (stored !== null) return JSON.parse(stored);
-    } catch {
-      // ignore
-    }
-    return false;
-  });
+  // Authentication is a session state. Never restore it from browser storage.
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const [hasAdminClearance, setHasAdminClearance] = useState<boolean>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_CLEARANCE_KEY);
-      if (stored !== null) return JSON.parse(stored);
-    } catch {
-      // ignore
-    }
-    return false;
-  });
+  const [hasAdminClearance, setHasAdminClearance] = useState(false);
 
   const [departments, setDepartments] = useState<DepartmentUnit[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_DEPTS_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) return (JSON.parse(stored) as DepartmentUnit[]).filter((dept) => dept.id !== 'dept-imp');
     } catch {
       // ignore
     }
     return SEED_DEPARTMENTS;
   });
 
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('dept-imp');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
 
   const [categories, setCategories] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_CATEGORIES_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) {
+        const defaultCategories = new Set([
+          'Inbound Staging & Receiving', 'MHE & Equipment Custody', 'Cold Storage & Temperature Vault',
+          'Customs & Bonded Freight', 'Hazardous & Dangerous Goods', 'Outbound Marshalling & Dispatch',
+          'Facility Safety & Environmental',
+        ]);
+        return (JSON.parse(stored) as string[]).filter((category) => !defaultCategories.has(category));
+      }
     } catch {
       // ignore
     }
@@ -283,7 +323,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [tasks, setTasks] = useState<ShiftActionItem[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_TASKS_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) return JSON.parse(stored) as ShiftActionItem[];
     } catch {
       // ignore
     }
@@ -293,7 +333,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [incidents, setIncidents] = useState<IncidentRecord[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_INCIDENTS_KEY);
-      if (stored) return JSON.parse(stored);
+      if (stored) return JSON.parse(stored) as IncidentRecord[];
     } catch {
       // ignore
     }
@@ -311,18 +351,49 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const [activeHandover, setActiveHandover] = useState<HandoverRecord>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_ACTIVE_KEY);
-      if (stored) return JSON.parse(stored);
-    } catch {
-      // ignore
-    }
+    const stored = readStored<HandoverRecord>(STORAGE_ACTIVE_KEY);
+    if (stored && stored.id !== 'hnd-current' && !isClosedShift(stored)) return stored;
     return INITIAL_ACTIVE_HANDOVER;
   });
 
-  const [archive, setArchive] = useState<HandoverRecord[]>(PAST_HANDOVER_ARCHIVE);
+  const [archive, setArchive] = useState<HandoverRecord[]>(() => {
+    const storedArchive = readStored<HandoverRecord[]>(STORAGE_ARCHIVE_KEY) ?? PAST_HANDOVER_ARCHIVE;
+    // A handover that an older build completed without archiving still belongs in the archive.
+    const storedActive = readStored<HandoverRecord>(STORAGE_ACTIVE_KEY);
+    if (storedActive && isClosedShift(storedActive) && !storedArchive.some((shift) => shift.id === storedActive.id)) {
+      return [storedActive, ...storedArchive];
+    }
+    return storedArchive;
+  });
   const [attendanceLogs] = useState<AttendanceAuditLog[]>(SEED_ATTENDANCE_LOGS);
-  const [complianceRecords, setComplianceRecords] = useState<SignoffComplianceRecord[]>(SEED_COMPLIANCE_RECORDS);
+
+  // Sign-off records are derived from the handovers themselves, so they survive a reload.
+  const complianceRecords = useMemo<SignoffComplianceRecord[]>(
+    () =>
+      [activeHandover, ...archive]
+        .filter((shift) => shift.signoff.outgoingConfirmed && shift.signoff.incomingConfirmed &&
+          shift.signoff.outgoingSignedAt && shift.signoff.incomingSignedAt)
+        .map((shift) => {
+          const outgoingSignedAt = shift.signoff.outgoingSignedAt as string;
+          const incomingSignedAt = shift.signoff.incomingSignedAt as string;
+          return {
+            id: `cmp-${shift.id}`,
+            handoverCode: shift.handoverCode,
+            departmentName: shift.wardOrDepartment,
+            date: localDateString(new Date(incomingSignedAt)),
+            shiftType: shift.shiftType,
+            outgoingSigner: shift.signoff.outgoingSignatureText || shift.signoff.outgoingStaffName,
+            outgoingSignedAt: formatTime(outgoingSignedAt),
+            incomingSigner: shift.signoff.incomingSignatureText || shift.signoff.incomingStaffName,
+            incomingSignedAt: formatTime(incomingSignedAt),
+            verificationHash: shift.signoff.verificationHash,
+            // Every record listed here carries both signatures.
+            complianceScore: 100,
+            timeDeltaMinutes: minutesBetween(outgoingSignedAt, incomingSignedAt),
+          };
+        }),
+    [activeHandover, archive]
+  );
 
   const [susEvaluations, setSusEvaluations] = useState<SusEvaluationRecord[]>(() => {
     try {
@@ -370,8 +441,8 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Local storage cache persistence
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_AUTH_KEY, JSON.stringify(isAuthenticated));
-      localStorage.setItem(STORAGE_CLEARANCE_KEY, JSON.stringify(hasAdminClearance));
+      localStorage.removeItem(STORAGE_AUTH_KEY);
+      localStorage.removeItem(STORAGE_CLEARANCE_KEY);
       localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(currentUser));
       localStorage.setItem(STORAGE_STAFF_KEY, JSON.stringify(staffList));
       localStorage.setItem(STORAGE_DEPTS_KEY, JSON.stringify(departments));
@@ -380,6 +451,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       localStorage.setItem(STORAGE_INCIDENTS_KEY, JSON.stringify(incidents));
       localStorage.setItem(STORAGE_OVERRIDES_KEY, JSON.stringify(overrideLogs));
       localStorage.setItem(STORAGE_ACTIVE_KEY, JSON.stringify(activeHandover));
+      localStorage.setItem(STORAGE_ARCHIVE_KEY, JSON.stringify(archive));
       localStorage.setItem(STORAGE_THEME_KEY, JSON.stringify(themeConfig));
       localStorage.setItem(STORAGE_SUS_KEY, JSON.stringify(susEvaluations));
     } catch {
@@ -394,7 +466,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [isAuthenticated, hasAdminClearance, currentUser, staffList, departments, categories, tasks, incidents, overrideLogs, activeHandover, themeConfig, susEvaluations]);
+  }, [isAuthenticated, hasAdminClearance, currentUser, staffList, departments, categories, tasks, incidents, overrideLogs, activeHandover, archive, themeConfig, susEvaluations]);
 
 
   // Initial cloud database synchronization (non-blocking)
@@ -414,8 +486,25 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           setIncidents(cloudData.incidents);
         }
         if (cloudData.shifts && cloudData.shifts.length > 0) {
-          const active = cloudData.shifts.find((s) => s.status !== 'completed' && s.status !== 'archived');
-          if (active) setActiveHandover(active);
+          const cloudArchive = cloudData.shifts.filter(isClosedShift);
+          const cloudClosedIds = new Set(cloudArchive.map((shift) => shift.id));
+          if (cloudArchive.length > 0) {
+            setArchive((prev) =>
+              [...cloudArchive, ...prev.filter((shift) => !cloudClosedIds.has(shift.id))].sort((a, b) =>
+                (b.completedAt || '').localeCompare(a.completedAt || '')
+              )
+            );
+          }
+          // Resume the most recently started open shift. Blank drafts are ignored.
+          const cloudActive = cloudData.shifts
+            .filter((shift) => !isClosedShift(shift) && shift.handoverCode)
+            .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))[0];
+          setActiveHandover((prev) => {
+            if (!cloudActive) return cloudClosedIds.has(prev.id) ? INITIAL_ACTIVE_HANDOVER : prev;
+            const localIsNewer = prev.id !== cloudActive.id && Boolean(prev.handoverCode) &&
+              !cloudClosedIds.has(prev.id) && (prev.createdAt || '') > (cloudActive.createdAt || '');
+            return localIsNewer ? prev : cloudActive;
+          });
         }
         setDbSyncStatus('synced');
       } catch {
@@ -459,6 +548,9 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (user.pin && user.pin !== pin) {
       return { success: false, error: 'Incorrect PIN provided for this staff account.' };
     }
+    if (user.status === 'suspended') {
+      return { success: false, error: 'This account is suspended. Contact an administrator.' };
+    }
 
     const adminPasskeyProvided = adminPasskey && adminPasskey.trim() === MASTER_ADMIN_PASSKEY;
     const isGrantedAdmin = user.isAdmin || Boolean(adminPasskeyProvided);
@@ -469,7 +561,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
     setIsAuthenticated(true);
     setHasAdminClearance(isGrantedAdmin);
-    setActiveTab(isGrantedAdmin ? 'admin' : 'roster');
+    setActiveTab(isGrantedAdmin ? 'admin' : 'active-handover');
 
     return { success: true };
   };
@@ -501,7 +593,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setCurrentUser(newUser);
     setIsAuthenticated(true);
     setHasAdminClearance(isGrantedAdmin);
-    setActiveTab(isGrantedAdmin ? 'admin' : 'roster');
+    setActiveTab(isGrantedAdmin ? 'admin' : 'active-handover');
 
     return { success: true, user: newUser };
   };
@@ -517,7 +609,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const signOutUser = () => {
     setIsAuthenticated(false);
     setHasAdminClearance(false);
-    setActiveTab('roster');
+    setActiveTab('active-handover');
   };
 
   // Admin & RBAC methods
@@ -538,8 +630,9 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const overrideShiftSignoff = (shiftId: string, reason: string) => {
-    const nowIso = new Date().toISOString();
-    const hash = `SHA256:ADMIN-OVR-${Math.random().toString(16).substring(2, 10)}${Date.now().toString(16)}`;
+    if (!isAuthenticated || !hasAdminClearance || !currentUser.isAdmin || !reason.trim() ||
+      shiftId !== activeHandover.id || activeHandover.status !== 'pending_signoff' ||
+      !activeHandover.signoff.outgoingConfirmed || !activeHandover.signoff.incomingConfirmed) return;
 
     const log: AdminOverrideLog = {
       id: `ovr-${Date.now().toString(36)}`,
@@ -549,55 +642,28 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       adminName: currentUser.name,
       adminId: currentUser.id,
       actionType: 'emergency_signoff',
-      reason,
-      timestamp: nowIso,
+      reason: reason.trim(),
+      timestamp: new Date().toISOString(),
     };
 
     setOverrideLogs((prev) => [log, ...prev]);
     saveOverrideToFirestore(log);
-
-    const updatedShift: HandoverRecord = {
-      ...activeHandover,
-      status: 'completed',
-      completedAt: nowIso,
-      isOverridden: true,
-      overrideReason: reason,
-      signoff: {
-        ...activeHandover.signoff,
-        outgoingConfirmed: true,
-        outgoingSignatureText: `${activeHandover.signoff.outgoingSignatureText || activeHandover.leadOutgoing.name} [Admin Overridden]`,
-        incomingConfirmed: true,
-        incomingSignatureText: `${currentUser.name} [Executive Administrative Override]`,
-        verificationHash: hash,
-      },
-    };
-
-    setActiveHandover(updatedShift);
-    saveShiftToFirestore(updatedShift);
+    finalizeShift({ reason: reason.trim() });
   };
 
   const resolveIncident = (incidentId: string, notes: string, rootCause: string) => {
-    let resolvedItem: IncidentRecord | null = null;
-    setIncidents((prev) =>
-      prev.map((inc) => {
-        if (inc.id === incidentId) {
-          const item: IncidentRecord = {
-            ...inc,
-            status: 'resolved',
-            resolvedBy: currentUser.name,
-            resolvedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            mitigationNotes: notes,
-            rootCause,
-          };
-          resolvedItem = item;
-          return item;
-        }
-        return inc;
-      })
-    );
-    if (resolvedItem) {
-      saveIncidentToFirestore(resolvedItem);
-    }
+    const incident = incidents.find((inc) => inc.id === incidentId);
+    if (!incident) return;
+    const resolved: IncidentRecord = {
+      ...incident,
+      status: 'resolved',
+      resolvedBy: currentUser.name,
+      resolvedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      mitigationNotes: notes,
+      rootCause,
+    };
+    setIncidents((prev) => prev.map((inc) => (inc.id === incidentId ? resolved : inc)));
+    saveIncidentToFirestore(resolved);
   };
 
   const reportIncident = (incidentData: Omit<IncidentRecord, 'id' | 'reportedAt' | 'status'>) => {
@@ -613,26 +679,17 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Roster rotation
   const assignStaffToRoster = (deptId: string, shiftType: ShiftType, staff: UserStaff) => {
-    let updatedDept: DepartmentUnit | null = null;
-    setDepartments((prev) =>
-      prev.map((d) => {
-        if (d.id !== deptId) return d;
-        const currentList = d.roster[shiftType];
-        if (currentList.some((s) => s.id === staff.id)) return d;
-        const dUpdated: DepartmentUnit = {
-          ...d,
-          roster: {
-            ...d.roster,
-            [shiftType]: [...currentList, staff],
-          },
-        };
-        updatedDept = dUpdated;
-        return dUpdated;
-      })
-    );
-    if (updatedDept) {
-      saveDepartmentToFirestore(updatedDept);
-    }
+    const dept = departments.find((d) => d.id === deptId);
+    if (!dept || dept.roster[shiftType].some((s) => s.id === staff.id)) return;
+    const updatedDept: DepartmentUnit = {
+      ...dept,
+      roster: {
+        ...dept.roster,
+        [shiftType]: [...dept.roster[shiftType], toPublicStaff(staff)],
+      },
+    };
+    setDepartments((prev) => prev.map((d) => (d.id === deptId ? updatedDept : d)));
+    saveDepartmentToFirestore(updatedDept);
   };
 
   // Dynamic Facility Zones / Departments Management (Saved to DB)
@@ -649,7 +706,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       currentShift: 'morning',
       shiftStatus: 'scheduled',
       roster: {
-        morning: [currentUser],
+        morning: [toPublicStaff(currentUser)],
         evening: [],
         night: [],
       },
@@ -660,20 +717,11 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateDepartment = (id: string, updatedFields: Partial<DepartmentUnit>) => {
-    let modified: DepartmentUnit | null = null;
-    setDepartments((prev) =>
-      prev.map((d) => {
-        if (d.id === id) {
-          const u = { ...d, ...updatedFields };
-          modified = u;
-          return u;
-        }
-        return d;
-      })
-    );
-    if (modified) {
-      saveDepartmentToFirestore(modified);
-    }
+    const dept = departments.find((d) => d.id === id);
+    if (!dept) return;
+    const modified: DepartmentUnit = { ...dept, ...updatedFields };
+    setDepartments((prev) => prev.map((d) => (d.id === id ? modified : d)));
+    saveDepartmentToFirestore(modified);
   };
 
   const deleteDepartment = (id: string) => {
@@ -717,54 +765,27 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const updateTaskStatus = (taskId: string, status: ShiftActionItem['status']) => {
-    let changedTask: ShiftActionItem | null = null;
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const item = { ...t, status };
-          changedTask = item;
-          return item;
-        }
-        return t;
-      })
-    );
-    if (changedTask) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      const changedTask: ShiftActionItem = { ...task, status };
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? changedTask : t)));
       saveTaskToFirestore(changedTask);
     }
 
-    const updatedShift = {
-      ...activeHandover,
-      actions: activeHandover.actions.map((t) => (t.id === taskId ? { ...t, status } : t)),
-    };
-    setActiveHandover(updatedShift);
-    saveShiftToFirestore(updatedShift);
+    if (activeHandover.actions.some((t) => t.id === taskId)) {
+      const updatedShift = {
+        ...activeHandover,
+        actions: activeHandover.actions.map((t) => (t.id === taskId ? { ...t, status } : t)),
+      };
+      setActiveHandover(updatedShift);
+      saveShiftToFirestore(updatedShift);
+    }
   };
 
   const toggleTaskStatus = (taskId: string) => {
-    let next: ShiftActionItem['status'] = 'in_progress';
-    let changedTask: ShiftActionItem | null = null;
-
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== taskId) return t;
-        if (t.status === 'pending') next = 'in_progress';
-        else if (t.status === 'in_progress') next = 'completed';
-        else next = 'pending';
-        const updated = { ...t, status: next };
-        changedTask = updated;
-        return updated;
-      })
-    );
-    if (changedTask) {
-      saveTaskToFirestore(changedTask);
-    }
-
-    const updatedShift = {
-      ...activeHandover,
-      actions: activeHandover.actions.map((t) => (t.id === taskId ? { ...t, status: next } : t)),
-    };
-    setActiveHandover(updatedShift);
-    saveShiftToFirestore(updatedShift);
+    const current = tasks.find((t) => t.id === taskId)?.status;
+    if (!current) return;
+    updateTaskStatus(taskId, current === 'pending' ? 'in_progress' : current === 'in_progress' ? 'completed' : 'pending');
   };
 
   const deleteTask = (taskId: string) => {
@@ -851,64 +872,64 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     saveShiftToFirestore(updated);
   };
 
-  const signOutgoingLead = (signatureName: string) => {
-    const nowIso = new Date().toISOString();
+  // Each signature belongs to the signed-in account, and one account cannot sign both sides.
+  const signOutgoingLead = () => {
+    if (!isAuthenticated || hasAdminClearance || !activeHandover.handoverCode ||
+      activeHandover.signoff.outgoingConfirmed) return;
+    const signer = toPublicStaff(currentUser);
     const updated: HandoverRecord = {
       ...activeHandover,
-      status: activeHandover.signoff.incomingConfirmed ? 'completed' : 'pending_signoff',
+      leadOutgoing: signer,
       signoff: {
         ...activeHandover.signoff,
+        outgoingStaffId: signer.id,
+        outgoingStaffName: signer.name,
+        outgoingRole: signer.role,
         outgoingConfirmed: true,
-        outgoingSignedAt: nowIso,
-        outgoingSignatureText: signatureName,
+        outgoingSignedAt: new Date().toISOString(),
+        outgoingSignatureText: signer.name,
       },
     };
     setActiveHandover(updated);
     saveShiftToFirestore(updated);
   };
 
-  const signIncomingLead = (signatureName: string) => {
+  const signIncomingLead = () => {
+    const { signoff } = activeHandover;
+    if (!isAuthenticated || hasAdminClearance || !signoff.outgoingConfirmed || signoff.incomingConfirmed ||
+      signoff.outgoingStaffId === currentUser.id) return;
+    const signer = toPublicStaff(currentUser);
     const nowIso = new Date().toISOString();
-    const hash = `SHA256:${Math.random().toString(16).substring(2, 10)}${Date.now().toString(16)}${Math.random().toString(16).substring(2, 10)}`;
     const updated: HandoverRecord = {
       ...activeHandover,
-      status: activeHandover.signoff.outgoingConfirmed ? 'completed' : 'pending_signoff',
+      // Only a handover with both signatures waits for administrator approval.
+      status: 'pending_signoff',
+      leadIncoming: signer,
+      transitionDurationMinutes: minutesBetween(signoff.outgoingSignedAt || nowIso, nowIso),
       signoff: {
-        ...activeHandover.signoff,
+        ...signoff,
+        incomingStaffId: signer.id,
+        incomingStaffName: signer.name,
+        incomingRole: signer.role,
         incomingConfirmed: true,
         incomingSignedAt: nowIso,
-        incomingSignatureText: signatureName,
-        verificationHash: hash,
+        incomingSignatureText: signer.name,
       },
     };
     setActiveHandover(updated);
     saveShiftToFirestore(updated);
-
-    const newCompliance: SignoffComplianceRecord = {
-      id: `cmp-${Date.now().toString(36)}`,
-      handoverCode: activeHandover.handoverCode,
-      departmentName: activeHandover.wardOrDepartment,
-      date: new Date().toISOString().split('T')[0],
-      shiftType: activeHandover.shiftType,
-      outgoingSigner: activeHandover.signoff.outgoingSignatureText || activeHandover.leadOutgoing.name,
-      outgoingSignedAt: new Date(activeHandover.signoff.outgoingSignedAt || nowIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      incomingSigner: signatureName,
-      incomingSignedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      verificationHash: hash,
-      complianceScore: 100,
-      timeDeltaMinutes: 8,
-    };
-    setComplianceRecords((prev) => [newCompliance, ...prev]);
   };
 
-  const completeAndArchiveShift = () => {
+  // Archives the signed handover and opens the next shift with the open items carried over.
+  const finalizeShift = (override?: { reason: string }) => {
     const nowIso = new Date().toISOString();
     const finalized: HandoverRecord = {
       ...activeHandover,
       status: 'completed',
       completedAt: nowIso,
+      ...(override ? { isOverridden: true, overrideReason: override.reason } : {}),
     };
-    setArchive((prev) => [finalized, ...prev]);
+    setArchive((prev) => [finalized, ...prev.filter((shift) => shift.id !== finalized.id)]);
     saveShiftToFirestore(finalized);
 
     const pendingActions: ShiftActionItem[] = activeHandover.actions
@@ -920,33 +941,35 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         carriedOverFromPrevious: true,
       }));
 
-    const nextCode = `KQ-${new Date().getFullYear()}-CARGO-${activeHandover.shiftType === 'night' ? 'DAY' : 'NIGHT'}-${Math.floor(Math.random() * 90 + 10)}`;
+    // The staff member who accepted this handover leads the next shift.
+    const nextLead = activeHandover.leadIncoming;
+    const nextType = NEXT_SHIFT[activeHandover.shiftType];
     const nextShift: HandoverRecord = {
       id: `hnd-${Date.now().toString(36)}`,
-      handoverCode: nextCode,
+      handoverCode: makeHandoverCode(nextType),
       wardOrDepartment: activeHandover.wardOrDepartment,
       departmentId: activeHandover.departmentId,
       sector: activeHandover.sector,
-      shiftType: activeHandover.shiftType === 'night' ? 'morning' : 'night',
-      shiftDate: new Date().toISOString().split('T')[0],
-      shiftWindow: activeHandover.shiftType === 'night' ? '07:00 - 19:30 EAT' : '19:00 - 07:30 EAT',
+      shiftType: nextType,
+      shiftDate: localDateString(),
+      shiftWindow: SHIFT_WINDOWS[nextType],
       status: 'in_progress',
-      leadOutgoing: activeHandover.leadIncoming,
-      leadIncoming: SEED_STAFF[1] || SEED_STAFF[0],
-      attendanceCount: 1,
+      leadOutgoing: nextLead,
+      leadIncoming: UNASSIGNED_STAFF,
+      attendanceCount: 0,
       transitionDurationMinutes: 0,
       summaryNotes: 'Shift initiated. All unresolved items from prior shift rolled over automatically.',
-      cases: activeHandover.cases.map((c) => ({ ...c, lastUpdated: '07:05 AM' })),
+      cases: activeHandover.cases,
       equipment: activeHandover.equipment.map((eq) => ({ ...eq, custodyChecked: false })),
       actions: pendingActions,
       signoff: {
-        outgoingStaffId: activeHandover.leadIncoming.id,
-        outgoingStaffName: activeHandover.leadIncoming.name,
-        outgoingRole: activeHandover.leadIncoming.role,
+        outgoingStaffId: nextLead.id,
+        outgoingStaffName: nextLead.name,
+        outgoingRole: nextLead.role,
         outgoingConfirmed: false,
-        incomingStaffId: SEED_STAFF[1]?.id || SEED_STAFF[0].id,
-        incomingStaffName: SEED_STAFF[1]?.name || SEED_STAFF[0].name,
-        incomingRole: SEED_STAFF[1]?.role || SEED_STAFF[0].role,
+        incomingStaffId: '',
+        incomingStaffName: '',
+        incomingRole: '',
         incomingConfirmed: false,
       },
       createdAt: nowIso,
@@ -956,41 +979,44 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     saveShiftToFirestore(nextShift);
   };
 
+  const completeAndArchiveShift = () => {
+    if (!isAuthenticated || !hasAdminClearance || !currentUser.isAdmin ||
+      !activeHandover.signoff.outgoingConfirmed || !activeHandover.signoff.incomingConfirmed) return;
+    finalizeShift();
+  };
+
   const startNewShift = (shiftType: ShiftType, wardName: string) => {
-    const nowIso = new Date().toISOString();
-    const code = `ZAMU-${new Date().getFullYear()}-${shiftType.toUpperCase().slice(0, 3)}-${Math.floor(Math.random() * 900 + 100)}`;
+    const lead = toPublicStaff(currentUser);
+    const department = departments.find((d) => d.name === wardName);
     const newRecord: HandoverRecord = {
       id: `hnd-${Date.now().toString(36)}`,
-      handoverCode: code,
+      handoverCode: makeHandoverCode(shiftType),
       wardOrDepartment: wardName,
-      departmentId: selectedDepartmentId,
+      departmentId: department?.id || selectedDepartmentId,
       sector: themeConfig.sector,
-      shiftType: shiftType,
-      shiftDate: new Date().toISOString().split('T')[0],
-      shiftWindow: shiftType === 'morning' ? '07:00 - 15:30' : shiftType === 'evening' ? '15:00 - 23:30' : '23:00 - 07:30',
+      shiftType,
+      shiftDate: localDateString(),
+      shiftWindow: SHIFT_WINDOWS[shiftType],
       status: 'in_progress',
-      leadOutgoing: currentUser,
-      leadIncoming: SEED_STAFF[1] || SEED_STAFF[0],
-      attendanceCount: 4,
-      transitionDurationMinutes: 12,
-      summaryNotes: `Fresh shift handover initiated for ${wardName}. Direct input active.`,
+      leadOutgoing: lead,
+      leadIncoming: UNASSIGNED_STAFF,
+      attendanceCount: 0,
+      transitionDurationMinutes: 0,
+      summaryNotes: '',
       cases: [],
-      equipment: [
-        { id: 'eq-new-1', name: 'High-Lift Reach Truck', assetTag: 'MHE-RT-01', location: wardName, status: 'functional', batteryPercent: 92, custodyChecked: true },
-        { id: 'eq-new-2', name: 'Barcode RF Scanner #04', assetTag: 'RF-SCAN-04', location: wardName, status: 'functional', batteryPercent: 100, custodyChecked: true },
-      ],
+      equipment: [],
       actions: [],
       signoff: {
-        outgoingStaffId: currentUser.id,
-        outgoingStaffName: currentUser.name,
-        outgoingRole: currentUser.role,
+        outgoingStaffId: lead.id,
+        outgoingStaffName: lead.name,
+        outgoingRole: lead.role,
         outgoingConfirmed: false,
-        incomingStaffId: SEED_STAFF[1]?.id || 'usr-002',
-        incomingStaffName: SEED_STAFF[1]?.name || 'David Kiprop',
-        incomingRole: SEED_STAFF[1]?.role || 'Duty Lead',
+        incomingStaffId: '',
+        incomingStaffName: '',
+        incomingRole: '',
         incomingConfirmed: false,
       },
-      createdAt: nowIso,
+      createdAt: new Date().toISOString(),
     };
 
     setActiveHandover(newRecord);

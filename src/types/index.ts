@@ -181,7 +181,7 @@ export interface SignoffComplianceRecord {
   outgoingSignedAt: string;
   incomingSigner: string;
   incomingSignedAt: string;
-  verificationHash: string;
+  verificationHash?: string;
   complianceScore: number;
   timeDeltaMinutes: number;
 }

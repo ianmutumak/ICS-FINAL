@@ -39,25 +39,18 @@ export const SEED_STAFF: UserStaff[] = [
   },
 ];
 
-export const SEED_DEPARTMENTS: DepartmentUnit[] = [
-  {
-    id: 'dept-imp',
-    code: 'KQ-IMP',
-    name: 'KQ Import Bonded Freight Warehouse',
-    building: 'JKIA Cargo Village Terminal 1',
-    floor: 'Bays 01-16 & Customs Bond Zone',
-    capacity: 2500,
-    activeUnits: 0,
-    headOfDepartment: 'Mary Wanjiku',
-    currentShift: 'morning',
-    shiftStatus: 'scheduled',
-    roster: {
-      morning: [SEED_STAFF[0]],
-      evening: [],
-      night: [],
-    },
-  },
-];
+// Placeholder for a handover role nobody has taken yet.
+export const UNASSIGNED_STAFF: UserStaff = {
+  id: '',
+  staffNumber: '',
+  name: 'Not yet assigned',
+  role: '',
+  department: '',
+  qualification: '',
+  avatarSeed: '',
+};
+
+export const SEED_DEPARTMENTS: DepartmentUnit[] = [];
 
 export const SEED_TASKS: ShiftActionItem[] = [];
 
@@ -66,34 +59,34 @@ export const SEED_INCIDENTS: IncidentRecord[] = [];
 export const SEED_OVERRIDE_LOGS: AdminOverrideLog[] = [];
 
 export const INITIAL_ACTIVE_HANDOVER: HandoverRecord = {
-  id: 'hnd-current',
-  handoverCode: 'KQ-2026-IMP-MORN-01',
-  wardOrDepartment: 'KQ Import Bonded Freight Warehouse',
-  departmentId: 'dept-imp',
+  id: 'draft-current',
+  handoverCode: '',
+  wardOrDepartment: '',
+  departmentId: '',
   sector: 'kq_bonded_freight',
   shiftType: 'morning',
-  shiftDate: '2026-11-02',
-  shiftWindow: '07:00 - 15:30 EAT',
+  shiftDate: '',
+  shiftWindow: '',
   status: 'in_progress',
-  leadOutgoing: SEED_STAFF[0],
-  leadIncoming: SEED_STAFF[1],
-  attendanceCount: 1,
+  leadOutgoing: UNASSIGNED_STAFF,
+  leadIncoming: UNASSIGNED_STAFF,
+  attendanceCount: 0,
   transitionDurationMinutes: 0,
   summaryNotes: '',
   cases: [],
   equipment: [],
   actions: [],
   signoff: {
-    outgoingStaffId: SEED_STAFF[0].id,
-    outgoingStaffName: SEED_STAFF[0].name,
-    outgoingRole: SEED_STAFF[0].role,
+    outgoingStaffId: '',
+    outgoingStaffName: '',
+    outgoingRole: '',
     outgoingConfirmed: false,
-    incomingStaffId: SEED_STAFF[1].id,
-    incomingStaffName: SEED_STAFF[1].name,
-    incomingRole: SEED_STAFF[1].role,
+    incomingStaffId: '',
+    incomingStaffName: '',
+    incomingRole: '',
     incomingConfirmed: false,
   },
-  createdAt: '2026-11-02T07:00:00Z',
+  createdAt: '',
 };
 
 export const PAST_HANDOVER_ARCHIVE: HandoverRecord[] = [];
@@ -102,14 +95,6 @@ export const SEED_ATTENDANCE_LOGS: AttendanceAuditLog[] = [];
 
 export const SEED_COMPLIANCE_RECORDS: SignoffComplianceRecord[] = [];
 
-export const SEED_CATEGORIES: string[] = [
-  'Inbound Staging & Receiving',
-  'MHE & Equipment Custody',
-  'Cold Storage & Temperature Vault',
-  'Customs & Bonded Freight',
-  'Hazardous & Dangerous Goods',
-  'Outbound Marshalling & Dispatch',
-  'Facility Safety & Environmental',
-];
+export const SEED_CATEGORIES: string[] = [];
 
 export const SEED_SUS_EVALUATIONS: SusEvaluationRecord[] = [];

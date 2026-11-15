@@ -7,4 +7,6 @@ coverage/
 .env*
 !.env.example
 
-docs/
+docs/*
+!docs/
+!docs/system-design.md
