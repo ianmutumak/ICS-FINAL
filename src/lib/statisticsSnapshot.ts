@@ -1,18 +1,31 @@
-import { HandoverRecord, ShiftActionItem, AttendanceAuditLog, SignoffComplianceRecord } from '../types';
+import type { HandoverRecord, ShiftActionItem, AttendanceAuditLog, SignoffComplianceRecord } from '../types';
 
+/** A handover should take no longer than this between the two signatures. */
+export const TRANSITION_TARGET_MINUTES = 20;
+
+/**
+ * Aggregate figures for the statistics page and the assistant.
+ * It holds counts only: no names and no SBAR text ever leave the browser.
+ */
 export interface StatisticsSnapshot {
   datasetKind: 'application' | 'synthetic';
-  dataNote: string;
   handoverCount: number;
   dateRange: { from: string | null; to: string | null };
   handoversByStatus: Record<string, number>;
   handoversByShift: Record<string, number>;
   handoversByMonth: Record<string, number>;
-  averageTransitionMinutes: number | null;
-  sbar: { total: number; complete: number; incomplete: number; completePercent: number | null };
+  /** Minutes between the outgoing and incoming signatures, for handovers where both exist. */
+  transition: {
+    measured: number;
+    averageMinutes: number | null;
+    withinTarget: number;
+    targetMinutes: number;
+    averageByShift: Record<string, number>;
+  };
+  sbar: { total: number; complete: number };
   tasksByStatus: Record<string, number>;
-  attendance: { total: number; punctual: number; punctualPercent: number | null };
-  signoffs: { total: number; averageCompliancePercent: number | null };
+  attendance: { total: number; punctual: number };
+  signoffs: { total: number };
 }
 
 function countBy<T>(items: T[], getKey: (item: T) => string): Record<string, number> {
@@ -23,6 +36,35 @@ function countBy<T>(items: T[], getKey: (item: T) => string): Record<string, num
   }, {});
 }
 
+/** Running totals of handover durations, overall and per shift. */
+class DurationTally {
+  private total = 0;
+  private count = 0;
+  private withinTarget = 0;
+  private byShift: Record<string, { total: number; count: number }> = {};
+
+  add(shiftType: string, minutes: number) {
+    this.total += minutes;
+    this.count += 1;
+    if (minutes <= TRANSITION_TARGET_MINUTES) this.withinTarget += 1;
+    const shift = (this.byShift[shiftType] ??= { total: 0, count: 0 });
+    shift.total += minutes;
+    shift.count += 1;
+  }
+
+  summary(): StatisticsSnapshot['transition'] {
+    return {
+      measured: this.count,
+      averageMinutes: this.count ? Math.round(this.total / this.count) : null,
+      withinTarget: this.withinTarget,
+      targetMinutes: TRANSITION_TARGET_MINUTES,
+      averageByShift: Object.fromEntries(
+        Object.entries(this.byShift).map(([shift, { total, count }]) => [shift, Math.round(total / count)])
+      ),
+    };
+  }
+}
+
 export function createStatisticsSnapshot(args: {
   activeHandover: HandoverRecord;
   archive: HandoverRecord[];
@@ -30,51 +72,56 @@ export function createStatisticsSnapshot(args: {
   attendanceLogs: AttendanceAuditLog[];
   complianceRecords: SignoffComplianceRecord[];
 }): StatisticsSnapshot {
-  const handovers = [args.activeHandover, ...args.archive].filter((shift) =>
-    shift.handoverCode || shift.cases.length > 0 || shift.status === 'completed' || shift.status === 'archived'
-  );
+  // The blank draft that exists before a shift is started is not a handover.
+  const handovers = [args.activeHandover, ...args.archive].filter((shift) => Boolean(shift.handoverCode));
   const dates = handovers.map((shift) => shift.shiftDate).filter(Boolean).sort();
   const cases = handovers.flatMap((shift) => shift.cases);
   const completeCases = cases.filter((item) =>
     Boolean(item.situation?.trim() && item.background?.trim() && item.assessment?.trim() && item.recommendation?.trim())
   ).length;
-  const durations = handovers.filter((shift) => shift.status === 'completed' && shift.transitionDurationMinutes > 0);
-  const punctual = args.attendanceLogs.filter((log) => log.punctual).length;
-  const complianceTotal = args.complianceRecords.reduce((sum, record) => sum + record.complianceScore, 0);
+
+  const durations = new DurationTally();
+  handovers
+    .filter((shift) => shift.transitionDurationMinutes > 0)
+    .forEach((shift) => durations.add(shift.shiftType, shift.transitionDurationMinutes));
+
+  // Tasks rolled into a shift are tracked on the shift; standalone tasks are tracked in the task list.
+  const shiftTaskIds = new Set(handovers.flatMap((shift) => shift.actions.map((action) => action.id)));
+  const allTasks = [
+    ...handovers.flatMap((shift) => shift.actions),
+    ...args.tasks.filter((task) => !shiftTaskIds.has(task.id)),
+  ];
 
   return {
     datasetKind: 'application',
-    dataNote: 'Aggregated counts from the handover records currently loaded in the app. No names or SBAR text are included.',
     handoverCount: handovers.length,
     dateRange: { from: dates[0] || null, to: dates[dates.length - 1] || null },
     handoversByStatus: countBy(handovers, (shift) => shift.status),
     handoversByShift: countBy(handovers, (shift) => shift.shiftType),
     handoversByMonth: countBy(handovers.filter((shift) => Boolean(shift.shiftDate)), (shift) => shift.shiftDate.slice(0, 7)),
-    averageTransitionMinutes: durations.length
-      ? Math.round(durations.reduce((sum, shift) => sum + shift.transitionDurationMinutes, 0) / durations.length)
-      : null,
-    sbar: {
-      total: cases.length,
-      complete: completeCases,
-      incomplete: cases.length - completeCases,
-      completePercent: cases.length ? Math.round((completeCases / cases.length) * 100) : null,
-    },
-    tasksByStatus: countBy(args.tasks, (task) => task.status),
+    transition: durations.summary(),
+    sbar: { total: cases.length, complete: completeCases },
+    tasksByStatus: countBy(allTasks, (task) => task.status),
     attendance: {
       total: args.attendanceLogs.length,
-      punctual,
-      punctualPercent: args.attendanceLogs.length ? Math.round((punctual / args.attendanceLogs.length) * 100) : null,
+      punctual: args.attendanceLogs.filter((log) => log.punctual).length,
     },
-    signoffs: {
-      total: args.complianceRecords.length,
-      averageCompliancePercent: args.complianceRecords.length
-        ? Math.round(complianceTotal / args.complianceRecords.length)
-        : null,
-    },
+    signoffs: { total: args.complianceRecords.length },
   };
 }
 
+let cachedSynthetic: { key: string; snapshot: StatisticsSnapshot } | null = null;
+
+/**
+ * Generated sample figures for testing and demonstrations.
+ * A fixed seed gives the same data on every device on a given day. Nothing is written to the database.
+ */
 export function createSyntheticStatisticsSnapshot(handoverCount = 5000, seed = 144861): StatisticsSnapshot {
+  const today = new Date();
+  const cacheKey = `${handoverCount}:${seed}:${today.toISOString().slice(0, 10)}`;
+  if (cachedSynthetic?.key === cacheKey) return cachedSynthetic.snapshot;
+
+  // mulberry32: a small, repeatable random number generator.
   let state = seed >>> 0;
   const random = () => {
     state = (state + 0x6D2B79F5) | 0;
@@ -88,22 +135,18 @@ export function createSyntheticStatisticsSnapshot(handoverCount = 5000, seed = 1
   const handoversByShift: Record<string, number> = { morning: 0, evening: 0, night: 0 };
   const handoversByMonth: Record<string, number> = {};
   const tasksByStatus: Record<string, number> = { completed: 0, pending: 0, in_progress: 0, carried_over: 0 };
-  const today = new Date();
+  const durations = new DurationTally();
   const start = new Date(today);
   start.setUTCDate(start.getUTCDate() - 364);
-  let durationTotal = 0;
-  let durationCount = 0;
   let sbarTotal = 0;
   let sbarComplete = 0;
   let attendanceTotal = 0;
   let punctualTotal = 0;
   let signoffTotal = 0;
-  let complianceTotal = 0;
 
   for (let index = 0; index < handoverCount; index += 1) {
-    const dayOffset = Math.floor(random() * 365);
     const shiftDate = new Date(start);
-    shiftDate.setUTCDate(start.getUTCDate() + dayOffset);
+    shiftDate.setUTCDate(start.getUTCDate() + Math.floor(random() * 365));
     const month = shiftDate.toISOString().slice(0, 7);
     const statusDraw = random();
     const status = statusDraw < 0.72 ? 'completed' : statusDraw < 0.91 ? 'pending_signoff' : 'in_progress';
@@ -131,38 +174,27 @@ export function createSyntheticStatisticsSnapshot(handoverCount = 5000, seed = 1
       if (random() < 0.88) punctualTotal += 1;
     }
 
-    if (status === 'completed') {
-      durationTotal += 12 + Math.floor(random() * 25);
-      durationCount += 1;
+    // Both signatures exist once a handover is awaiting approval or completed.
+    if (status !== 'in_progress') {
       signoffTotal += 1;
-      complianceTotal += 90 + Math.floor(random() * 11);
+      // Night handovers run a little longer, as tired crews do.
+      durations.add(shiftType, 8 + Math.floor(random() * 22) + (shiftType === 'night' ? 4 : 0));
     }
   }
 
-  return {
+  const snapshot: StatisticsSnapshot = {
     datasetKind: 'synthetic',
-    dataNote: `${handoverCount.toLocaleString()} generated fictional handovers across the last 365 days. This sample is not stored in the database.`,
     handoverCount,
     dateRange: { from: start.toISOString().slice(0, 10), to: today.toISOString().slice(0, 10) },
     handoversByStatus,
     handoversByShift,
     handoversByMonth,
-    averageTransitionMinutes: durationCount ? Math.round(durationTotal / durationCount) : null,
-    sbar: {
-      total: sbarTotal,
-      complete: sbarComplete,
-      incomplete: sbarTotal - sbarComplete,
-      completePercent: sbarTotal ? Math.round((sbarComplete / sbarTotal) * 100) : null,
-    },
+    transition: durations.summary(),
+    sbar: { total: sbarTotal, complete: sbarComplete },
     tasksByStatus,
-    attendance: {
-      total: attendanceTotal,
-      punctual: punctualTotal,
-      punctualPercent: attendanceTotal ? Math.round((punctualTotal / attendanceTotal) * 100) : null,
-    },
-    signoffs: {
-      total: signoffTotal,
-      averageCompliancePercent: signoffTotal ? Math.round(complianceTotal / signoffTotal) : null,
-    },
+    attendance: { total: attendanceTotal, punctual: punctualTotal },
+    signoffs: { total: signoffTotal },
   };
+  cachedSynthetic = { key: cacheKey, snapshot };
+  return snapshot;
 }

@@ -1,978 +1,276 @@
 import React, { useMemo, useState } from 'react';
+import { FlaskConical } from 'lucide-react';
 import { useHandover } from '../../context/HandoverContext';
-import {
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  Users,
-  ShieldCheck,
-  TrendingDown,
-  Calendar,
-  FileCheck,
-  Award,
-  Sparkles,
-  BarChart3,
-  FileText,
-  Send,
-  Check,
-  HelpCircle,
-} from 'lucide-react';
-import { SbarProtocolIcon, DualSignoffStampIcon } from '../common/CustomSvgIcons';
+import { createStatisticsSnapshot, createSyntheticStatisticsSnapshot } from '../../lib/statisticsSnapshot';
 import { AdminStatisticsAssistant } from './AdminStatisticsAssistant';
-import { createStatisticsSnapshot } from '../../lib/statisticsSnapshot';
+import { BarList, ChartCard, ChartDatum, ColumnChart, StatTile } from './Charts';
 
-const SUS_QUESTIONS = [
-  { id: 1, text: 'I think that I would like to use this shift handover system frequently.', isPositive: true },
-  { id: 2, text: 'I found the system unnecessarily complex.', isPositive: false },
-  { id: 3, text: 'I thought the system was easy to use.', isPositive: true },
-  { id: 4, text: 'I think that I would need the support of a technical person to be able to use this system.', isPositive: false },
-  { id: 5, text: 'I found the various functions in this system were well integrated.', isPositive: true },
-  { id: 6, text: 'I thought there was too much inconsistency in this system.', isPositive: false },
-  { id: 7, text: 'I would imagine that most people would learn to use this system very quickly.', isPositive: true },
-  { id: 8, text: 'I found the system very cumbersome to use.', isPositive: false },
-  { id: 9, text: 'I felt very confident using the system.', isPositive: true },
-  { id: 10, text: 'I needed to learn a lot of things before I could get going with this system.', isPositive: false },
+const DEMO_DATA_KEY = 'zamu_statistics_demo_data_v7';
+
+const STATUS_LABELS: Record<string, string> = {
+  in_progress: 'In progress',
+  pending_signoff: 'Awaiting approval',
+  completed: 'Completed',
+  scheduled: 'Scheduled',
+  archived: 'Archived',
+};
+const TASK_LABELS: Record<string, string> = {
+  completed: 'Completed',
+  in_progress: 'In progress',
+  pending: 'Pending',
+  carried_over: 'Carried over',
+};
+const SHIFT_LABELS: Record<string, string> = { morning: 'Morning', evening: 'Evening', night: 'Night' };
+
+/** Turns a count map into chart rows in a fixed, meaningful order. */
+function toRows(counts: Record<string, number>, labels: Record<string, string>): ChartDatum[] {
+  const known = Object.keys(labels).filter((key) => key in counts);
+  const other = Object.keys(counts).filter((key) => !(key in labels));
+  return [...known, ...other].map((key) => ({ key, label: labels[key] ?? key.replace(/_/g, ' '), value: counts[key] }));
+}
+
+const percent = (part: number, total: number) => (total > 0 ? `${Math.round((part / total) * 100)}%` : '—');
+
+type SectionId = 'trend' | 'shifts' | 'status' | 'tasks' | 'assistant';
+const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: 'trend', label: 'Monthly trend' },
+  { id: 'shifts', label: 'Shifts' },
+  { id: 'status', label: 'Status' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'assistant', label: 'Assistant' },
 ];
 
 export const StatisticsAnalyticsView: React.FC = () => {
-  const {
-    archive,
-    activeHandover,
-    attendanceLogs,
-    complianceRecords,
-    tasks,
-    susEvaluations,
-    addSusEvaluation,
-    currentUser,
-  } = useHandover();
+  const { archive, activeHandover, attendanceLogs, complianceRecords, tasks } = useHandover();
 
-  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<'overview' | 'attendance' | 'compliance' | 'sus-debrief'>('overview');
-
-  // Debrief & SUS Form State
-  // 0 means the statement has not been answered yet.
-  const [susScores, setSusScores] = useState<number[]>(() => Array(10).fill(0));
-  const [supervisorName, setSupervisorName] = useState(currentUser.name || 'Mary Wanjiku');
-  const [supervisorRole, setSupervisorRole] = useState(currentUser.role || 'Shift Operations Supervisor');
-  const [debriefNotes, setDebriefNotes] = useState('');
-  const [bottlenecks, setBottlenecks] = useState('');
-  const [signoffFeedback, setSignoffFeedback] = useState('');
-  const [hasSubmitted, setHasSubmitted] = useState(false);
-
-  // Compute metrics
-  const allHandovers = [activeHandover, ...archive];
-  const completedHandovers = allHandovers.filter((h) => h.status === 'completed');
-  // Only handovers with a measured signature-to-signature time count toward the average.
-  const measuredHandovers = completedHandovers.filter((h) => h.transitionDurationMinutes > 0);
-
-  const avgDuration =
-    measuredHandovers.length > 0
-      ? Math.round(
-          measuredHandovers.reduce((acc, h) => acc + h.transitionDurationMinutes, 0) /
-            measuredHandovers.length
-        )
-      : 0;
-
-  const totalTasks = tasks.length;
-  const carriedOverTasks = tasks.filter((t) => t.carriedOverFromPrevious).length;
-  const carryOverRate = totalTasks > 0 ? ((carriedOverTasks / totalTasks) * 100).toFixed(1) : '0.0';
-
-  const punctualCount = attendanceLogs.filter((a) => a.punctual).length;
-  const attendanceRate =
-    attendanceLogs.length > 0 ? Math.round((punctualCount / attendanceLogs.length) * 100) : 0;
-
-  const avgCompliance =
-    complianceRecords.length > 0
-      ? Math.round(
-          complianceRecords.reduce((acc, c) => acc + c.complianceScore, 0) /
-            complianceRecords.length
-        )
-      : 0;
-
-  const gradeSus = (totalScore: number) => {
-    let grade: 'A' | 'B' | 'C' | 'D' | 'F' = 'F';
-    let adjectiveRating: 'Best Imaginable' | 'Excellent' | 'Good' | 'OK' | 'Poor' = 'Poor';
-    let percentileBenchmark = 20;
-
-    if (totalScore >= 80.3) {
-      grade = 'A';
-      adjectiveRating = totalScore >= 90 ? 'Best Imaginable' : 'Excellent';
-      percentileBenchmark = totalScore >= 90 ? 98 : 88;
-    } else if (totalScore >= 68.0) {
-      grade = 'B';
-      adjectiveRating = 'Good';
-      percentileBenchmark = 72;
-    } else if (totalScore >= 51.0) {
-      grade = 'C';
-      adjectiveRating = 'OK';
-      percentileBenchmark = 50;
+  const [view, setView] = useState<'overview' | 'records'>('overview');
+  const [hidden, setHidden] = useState<Set<SectionId>>(new Set());
+  const [useDemoData, setUseDemoData] = useState(() => {
+    try {
+      return localStorage.getItem(DEMO_DATA_KEY) === 'on';
+    } catch {
+      return false;
     }
+  });
 
-    return { grade, adjectiveRating, percentileBenchmark };
+  const chooseDataSource = (demo: boolean) => {
+    setUseDemoData(demo);
+    try {
+      localStorage.setItem(DEMO_DATA_KEY, demo ? 'on' : 'off');
+    } catch {
+      // The choice simply will not be remembered.
+    }
   };
 
-  // SUS Algorithm (Brooke, 1996)
-  const calculateCurrentSus = () => {
-    let oddSum = 0;
-    let evenSum = 0;
-    susScores.forEach((score, idx) => {
-      if (idx % 2 === 0) {
-        oddSum += (score - 1);
-      } else {
-        evenSum += (5 - score);
-      }
+  const toggleSection = (id: SectionId) => {
+    setHidden((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
-    const totalScore = (oddSum + evenSum) * 2.5;
-    return { totalScore, ...gradeSus(totalScore), oddSum, evenSum };
   };
 
-  // A score only exists once all ten statements have been answered.
-  const answeredCount = susScores.filter((score) => score >= 1).length;
-  const currentSus = answeredCount === susScores.length ? calculateCurrentSus() : null;
+  const appStatistics = useMemo(
+    () => createStatisticsSnapshot({ activeHandover, archive, tasks, attendanceLogs, complianceRecords }),
+    [activeHandover, archive, tasks, attendanceLogs, complianceRecords]
+  );
+  // Every number, chart and assistant answer on this page comes from this one object.
+  const stats = useDemoData ? createSyntheticStatisticsSnapshot() : appStatistics;
 
-  const handleScoreChange = (questionIdx: number, val: number) => {
-    const updated = [...susScores];
-    updated[questionIdx] = val;
-    setSusScores(updated);
-  };
+  const monthly: ChartDatum[] = Object.keys(stats.handoversByMonth).sort().map((month) => {
+    const date = new Date(`${month}-01T00:00:00`);
+    return {
+      key: month,
+      label: date.toLocaleDateString([], { month: 'short' }),
+      detail: date.toLocaleDateString([], { month: 'long', year: 'numeric' }),
+      value: stats.handoversByMonth[month],
+    };
+  });
+  const awaitingApproval = stats.handoversByStatus.pending_signoff ?? 0;
+  const taskTotal = Object.values(stats.tasksByStatus).reduce((sum, count) => sum + count, 0);
+  const { transition } = stats;
 
-  const handleSusSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentSus) return;
-    addSusEvaluation({
-      shiftId: activeHandover.id,
-      shiftCode: activeHandover.handoverCode,
-      departmentName: activeHandover.wardOrDepartment,
-      supervisorName: supervisorName.trim() || currentUser.name,
-      supervisorRole: supervisorRole.trim() || currentUser.role,
-      scores: susScores,
-      totalScore: currentSus.totalScore,
-      grade: currentSus.grade,
-      adjectiveRating: currentSus.adjectiveRating,
-      percentileBenchmark: currentSus.percentileBenchmark,
-      debriefNotes: debriefNotes.trim() || undefined,
-      operationalBottlenecks: bottlenecks.trim() || undefined,
-      signoffVerificationFeedback: signoffFeedback.trim() || undefined,
-    });
-    setHasSubmitted(true);
-    setSusScores(Array(10).fill(0));
-    setDebriefNotes('');
-    setBottlenecks('');
-    setSignoffFeedback('');
-    setTimeout(() => setHasSubmitted(false), 4000);
-  };
-
-  // Aggregate Institutional SUS average
-  const institutionalSusMean =
-    susEvaluations.length > 0
-      ? susEvaluations.reduce((acc, s) => acc + s.totalScore, 0) / susEvaluations.length
-      : null;
-  const institutionalAvgSus = institutionalSusMean !== null ? institutionalSusMean.toFixed(1) : '—';
-
-  // Shift duration trends from actual completed handovers
-  const shiftTrendData = completedHandovers.map((h) => ({
-    code: h.handoverCode,
-    duration: h.transitionDurationMinutes || 0,
-    target: 20,
-    shift: h.shiftType.charAt(0).toUpperCase() + h.shiftType.slice(1),
-  }));
-
-  const statisticsSnapshot = useMemo(() => createStatisticsSnapshot({
-    activeHandover,
-    archive,
-    tasks,
-    attendanceLogs,
-    complianceRecords,
-  }), [activeHandover, archive, tasks, attendanceLogs, complianceRecords]);
+  const show = (id: SectionId) => !hidden.has(id);
+  const segment = (active: boolean) =>
+    `rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors ${
+      active ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'
+    }`;
 
   return (
     <div className="space-y-6">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Statistics</h1>
+          <p className="mt-1 text-base text-slate-600 dark:text-slate-300">
+            {stats.handoverCount.toLocaleString()} handovers
+            {stats.dateRange.from ? ` · ${stats.dateRange.from} to ${stats.dateRange.to}` : ''}
+          </p>
+        </div>
 
-      {/* Header */}
-      <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-mono text-teal-700 dark:text-teal-400 font-semibold">
-                Governance & QA
-              </span>
-              <span>·</span>
-              <span>Shift Telemetry</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Operational Analytics
-            </h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <div role="group" aria-label="Data source" className="flex gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+            <button type="button" aria-pressed={!useDemoData} onClick={() => chooseDataSource(false)} className={segment(!useDemoData)}>
+              Live data
+            </button>
+            <button type="button" aria-pressed={useDemoData} onClick={() => chooseDataSource(true)} className={`${segment(useDemoData)} inline-flex items-center gap-1.5`}>
+              <FlaskConical className="h-4 w-4" /> Demo data
+            </button>
           </div>
-
-          {/* Sub-tab switcher with icons */}
-          <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs">
-            <button
-              onClick={() => setActiveAnalyticsTab('overview')}
-              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
-                activeAnalyticsTab === 'overview'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-              <span>Metrics</span>
+          <div role="tablist" aria-label="View" className="flex gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
+            <button type="button" role="tab" aria-selected={view === 'overview'} onClick={() => setView('overview')} className={segment(view === 'overview')}>
+              Overview
             </button>
-            <button
-              onClick={() => setActiveAnalyticsTab('attendance')}
-              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
-                activeAnalyticsTab === 'attendance'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 text-blue-500" />
-              <span>Attendance ({attendanceLogs.length})</span>
-            </button>
-            <button
-              onClick={() => setActiveAnalyticsTab('compliance')}
-              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
-                activeAnalyticsTab === 'compliance'
-                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-              <span>Audits ({complianceRecords.length})</span>
-            </button>
-            <button
-              onClick={() => setActiveAnalyticsTab('sus-debrief')}
-              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer ${
-                activeAnalyticsTab === 'sus-debrief'
-                  ? 'bg-teal-700 text-white shadow-xs dark:bg-teal-600 font-semibold'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-              }`}
-            >
-              <FileCheck className="w-3.5 h-3.5 text-amber-400" />
-              <span>Usability ({susEvaluations.length})</span>
+            <button type="button" role="tab" aria-selected={view === 'records'} onClick={() => setView('records')} className={segment(view === 'records')}>
+              Sign-off records
             </button>
           </div>
         </div>
+      </header>
 
-
-        {/* 4 Main KPI Metrics Strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6 pt-5 border-t border-slate-100 dark:border-slate-800 text-xs">
-          {/* KPI 1: Handover Transition Time */}
-          <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px] uppercase">
-                AVG TRANSITION TIME
-              </span>
-              <Clock className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white tabular-nums">
-                {measuredHandovers.length > 0 ? `${avgDuration}m` : '—'}
-              </span>
-              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center">
-                {completedHandovers.length} handovers
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 block">Based on completed handovers</span>
-          </div>
-
-          {/* KPI 2: Task Carry-Over Rate */}
-          <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px] uppercase">
-                TASK CARRY-OVER RATE
-              </span>
-              <FileCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white tabular-nums">
-                {totalTasks > 0 ? `${carryOverRate}%` : '—'}
-              </span>
-              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                ({carriedOverTasks} rolled over)
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 block">Based on recorded tasks</span>
-          </div>
-
-          {/* KPI 3: Sign-Off Compliance */}
-          <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px] uppercase">
-                DUAL SIGN-OFF COMPLIANCE
-              </span>
-              <ShieldCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-teal-700 dark:text-teal-400 tabular-nums">
-                {complianceRecords.length > 0 ? `${avgCompliance}%` : '—'}
-              </span>
-              <span className="text-[11px] font-semibold text-emerald-600">
-                {complianceRecords.length} handovers
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 block">Based on recorded sign-offs</span>
-          </div>
-
-          {/* KPI 4: Staff Huddle Attendance */}
-          <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-slate-500 dark:text-slate-400 font-mono text-[10px] uppercase">
-                HUDDLE ATTENDANCE
-              </span>
-              <Users className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white tabular-nums">
-                {attendanceLogs.length > 0 ? `${attendanceRate}%` : '—'}
-              </span>
-              <span className="text-[11px] font-medium text-slate-500">
-                {punctualCount}/{attendanceLogs.length} on time
-              </span>
-            </div>
-            <span className="text-[10px] text-slate-400 block">Joint shift presence</span>
-          </div>
-        </div>
-      </section>
-
-      <AdminStatisticsAssistant statistics={statisticsSnapshot} />
-
-      {/* Tab Content 1: Turnover Metrics & Duration Trends */}
-      {activeAnalyticsTab === 'overview' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Shift Duration Chart (8 cols) */}
-          <div className="lg:col-span-8 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Handover Transition Duration vs 20-Minute Target
-                </h3>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Minutes between the outgoing and incoming signatures
-                </span>
-              </div>
-              <span className="text-xs font-mono text-teal-700 dark:text-teal-400">
-                Target: &le; 20m
-              </span>
-            </div>
-
-            {/* Visual Bars */}
-            <div className="space-y-3 pt-2">
-              {shiftTrendData.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400">
-                  <Clock className="w-6 h-6 mx-auto mb-1.5 opacity-40" />
-                  <p>No completed handover cycles recorded yet.</p>
-                </div>
-              ) : (
-                shiftTrendData.map((s) => {
-                  const isUnderTarget = s.duration <= s.target;
-                  const percentage = Math.min(100, Math.round((s.duration / 30) * 100));
-                  return (
-                    <div key={s.code} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold text-slate-900 dark:text-white">
-                            {s.code}
-                          </span>
-                          <span className="text-[11px] text-slate-500">· {s.shift} Duty</span>
-                        </div>
-                        <span
-                          className={`font-mono font-bold ${
-                            isUnderTarget
-                              ? 'text-emerald-700 dark:text-emerald-400'
-                              : 'text-amber-600 dark:text-amber-400'
-                          }`}
-                        >
-                          {s.duration} mins
-                        </span>
-                      </div>
-
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden flex">
-                        <div
-                          style={{ width: `${percentage}%` }}
-                          className={`h-full rounded-full transition-all duration-300 ${
-                            isUnderTarget
-                              ? 'bg-teal-600 dark:bg-teal-500'
-                              : 'bg-amber-500 dark:bg-amber-400'
-                          }`}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 mt-4">
-              Metrics are calculated from completed handovers recorded in this system.
-            </div>
-          </div>
-
-          {/* Task Resolution Breakdown (4 cols) */}
-          <div className="lg:col-span-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              Task Velocity & Roll-Over Safety
-            </h3>
-
-            <div className="space-y-4 pt-2 text-xs">
-              <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-emerald-800 dark:text-emerald-300 font-bold block">
-                  Completed Within Shift
-                </span>
-                <span className="text-xl font-bold font-mono text-emerald-900 dark:text-emerald-200">
-                  {totalTasks > 0 ? `${(100 - parseFloat(carryOverRate)).toFixed(1)}%` : '—'}
-                </span>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                  Urgent putaways, battery equalizing cycles, and pre-shift MHE clearances resolved before sign-off.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20 space-y-1">
-                <span className="text-[10px] font-mono uppercase text-amber-800 dark:text-amber-300 font-bold block">
-                  Rolled Forward (Zero-Loss)
-                </span>
-                <span className="text-xl font-bold font-mono text-amber-900 dark:text-amber-200">
-                  {totalTasks > 0 ? `${carryOverRate}%` : '—'}
-                </span>
-                <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                  Unfinished putaways, pending dock receipts, and preventative maintenance observations seamlessly passed to incoming shift priority queue.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+      {useDemoData && (
+        <p role="status" className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+          <span>
+            <span className="font-bold">Demo data is on. </span>
+            These figures are {stats.handoverCount.toLocaleString()} generated handovers covering the past year, for testing and presentations.
+            They are not real records and nothing is saved to the database.
+          </span>
+        </p>
       )}
 
-      {/* Tab Content 2: Staff Attendance & Huddle Check-In History */}
-      {activeAnalyticsTab === 'attendance' && (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Staff Shift Huddle Attendance Log
-              </h3>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Verified physical check-in and huddle participation records
-              </span>
-            </div>
-            <span className="text-xs font-mono text-teal-700 dark:text-teal-400">
-              Turnout: {attendanceRate}%
-            </span>
+      {view === 'overview' ? (
+        <>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatTile
+              label="Handovers"
+              value={stats.handoverCount.toLocaleString()}
+              note={`${(stats.handoversByStatus.completed ?? 0).toLocaleString()} completed`}
+            />
+            <StatTile
+              label="Awaiting approval"
+              value={awaitingApproval.toLocaleString()}
+              note={awaitingApproval === 0 ? 'Nothing is waiting' : 'Signed by both, not yet approved'}
+            />
+            <StatTile
+              label="Average handover time"
+              value={transition.averageMinutes !== null ? `${transition.averageMinutes} min` : '—'}
+              note={transition.measured > 0
+                ? `${percent(transition.withinTarget, transition.measured)} within the ${transition.targetMinutes}-minute target`
+                : 'Measured between the two signatures'}
+            />
+            <StatTile
+              label="Complete SBAR updates"
+              value={percent(stats.sbar.complete, stats.sbar.total)}
+              note={stats.sbar.total > 0
+                ? `${stats.sbar.complete.toLocaleString()} of ${stats.sbar.total.toLocaleString()} updates`
+                : 'No updates recorded yet'}
+            />
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-mono text-[11px] bg-slate-50/50 dark:bg-slate-800/40">
-                  <th className="py-2.5 px-4 font-semibold">Staff Member</th>
-                  <th className="py-2.5 px-4 font-semibold">Staff ID</th>
-                  <th className="py-2.5 px-4 font-semibold">Role</th>
-                  <th className="py-2.5 px-4 font-semibold">Department</th>
-                  <th className="py-2.5 px-4 font-semibold">Shift Window</th>
-                  <th className="py-2.5 px-4 font-semibold">Arrival Time</th>
-                  <th className="py-2.5 px-4 text-right font-semibold">Punctuality</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {attendanceLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">
-                      No attendance audit records logged yet
-                    </td>
-                  </tr>
-                ) : (
-                  attendanceLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                    <td className="py-2.5 px-4 font-medium text-slate-900 dark:text-white">
-                      {log.staffName}
-                    </td>
-                    <td className="py-2.5 px-4 font-mono text-slate-500">
-                      {log.staffNumber}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300">
-                      {log.role}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300">
-                      {log.departmentName}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-500 capitalize">
-                      {log.shiftType}
-                    </td>
-                    <td className="py-2.5 px-4 font-mono tabular-nums text-slate-700 dark:text-slate-300">
-                      {log.arrivedAt}
-                    </td>
-                    <td className="py-2.5 px-4 text-right">
-                      {log.punctual ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Punctual
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded">
-                          <AlertTriangle className="w-3 h-3 text-amber-600" /> Tardy Check-In
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab Content 3: Sign-Off Compliance & Cryptographic Audit Ledger */}
-      {activeAnalyticsTab === 'compliance' && (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Dual Sign-Off Attestation Ledger & Hashes
-              </h3>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Review recorded staff signatures and approval status.
-              </span>
-            </div>
-            <span className="text-xs font-mono text-teal-700 dark:text-teal-400">
-              Avg Score: {avgCompliance}%
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-mono text-[11px] bg-slate-50/50 dark:bg-slate-800/40">
-                  <th className="py-2.5 px-4 font-semibold">Handover Code</th>
-                  <th className="py-2.5 px-4 font-semibold">Department</th>
-                  <th className="py-2.5 px-4 font-semibold">Outgoing Lead & Time</th>
-                  <th className="py-2.5 px-4 font-semibold">Incoming Lead & Time</th>
-                  <th className="py-2.5 px-4 font-semibold">Turnover Delta</th>
-                  <th className="py-2.5 px-4 font-semibold">Integrity Hash</th>
-                  <th className="py-2.5 px-4 text-right font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {complianceRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-400">
-                      No sign-off compliance records logged yet
-                    </td>
-                  </tr>
-                ) : (
-                  complianceRecords.map((cmp) => (
-                    <tr key={cmp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                    <td className="py-2.5 px-4 font-mono font-bold text-teal-700 dark:text-teal-400">
-                      {cmp.handoverCode}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-900 dark:text-white">
-                      {cmp.departmentName}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-700 dark:text-slate-300">
-                      <div>{cmp.outgoingSigner}</div>
-                      <span className="text-[10px] font-mono text-slate-400">{cmp.outgoingSignedAt}</span>
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-700 dark:text-slate-300">
-                      <div>{cmp.incomingSigner}</div>
-                      <span className="text-[10px] font-mono text-slate-400">{cmp.incomingSignedAt}</span>
-                    </td>
-                    <td className="py-2.5 px-4 font-mono tabular-nums text-slate-600 dark:text-slate-300">
-                      {cmp.timeDeltaMinutes} mins
-                    </td>
-                    <td className="py-2.5 px-4 font-mono text-[10px] text-slate-500 max-w-[140px] truncate select-all">
-                      {cmp.verificationHash}
-                    </td>
-                    <td className="py-2.5 px-4 text-right">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
-                        <ShieldCheck className="w-3 h-3 text-emerald-600" /> {cmp.complianceScore}% Verified
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Tab Content 4: System Usability Scale (SUS) (Brooke, 1996) & Supervisor Debrief */}
-      {activeAnalyticsTab === 'sus-debrief' && (
-        <div className="space-y-6">
-          {/* Institutional Usability Benchmark Strip */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-mono uppercase text-slate-500 dark:text-slate-400 block">
-                  Institutional SUS Mean
-                </span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-3xl font-extrabold font-mono text-teal-700 dark:text-teal-400">
-                    {institutionalAvgSus}
-                  </span>
-                  <span className="text-xs font-bold text-slate-400">/ 100</span>
-                  {institutionalSusMean !== null && (
-                    <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                      Grade {gradeSus(institutionalSusMean).grade}
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                  Standard industry average: 68.0
-                  {institutionalSusMean !== null &&
-                    ` · ${institutionalSusMean >= 68 ? '+' : ''}${(institutionalSusMean - 68).toFixed(1)} pts`}
-                </span>
-              </div>
-              <Award className="w-8 h-8 text-teal-600 dark:text-teal-400 opacity-80" />
-            </div>
-
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-mono uppercase text-slate-500 dark:text-slate-400 block">
-                  Evaluated Shift Context
-                </span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white mt-1 block">
-                  {activeHandover.handoverCode}
-                </span>
-                <span className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 block truncate">
-                  {activeHandover.wardOrDepartment}
-                </span>
-                <span className="text-[10px] font-mono text-teal-700 dark:text-teal-400 mt-1 block">
-                  {activeHandover.shiftWindow} · {activeHandover.shiftType} shift
-                </span>
-              </div>
-              <Sparkles className="w-8 h-8 text-amber-500 opacity-80" />
-            </div>
-
-            <div className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs flex items-center justify-between">
-              <div>
-                <span className="text-[11px] font-mono uppercase text-slate-500 dark:text-slate-400 block">
-                  Research Methodology
-                </span>
-                <span className="text-sm font-bold text-slate-900 dark:text-white mt-1 block">
-                  John Brooke (1996)
-                </span>
-                <span className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 block">
-                  Odd Items: (X - 1) · Even Items: (5 - X)
-                </span>
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Standard Operational Usability Protocol
-                </span>
-              </div>
-              <FileCheck className="w-8 h-8 text-slate-400 opacity-80" />
-            </div>
-          </div>
-
-          {/* Main Evaluation Split: 10-Item Likert Survey (Left) vs Live Score & Debrief Notes (Right) */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Left 7 Columns: 10-Item Matrix */}
-            <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
-              <div className="pb-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <BarChart3 className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                    10-Item System Usability Scale (SUS)
-                  </h3>
-                  <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Rate each statement on the 5-point scale from Strongly Disagree (1) to Strongly Agree (5)
-                  </span>
-                </div>
-                <span className="text-[11px] font-mono font-semibold text-teal-700 dark:text-teal-400">
-                  {currentSus ? `Live Score: ${currentSus.totalScore}` : `${answeredCount}/10 answered`}
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                {SUS_QUESTIONS.map((q, idx) => {
-                  const currentVal = susScores[idx];
-                  return (
-                    <div
-                      key={q.id}
-                      className="p-3.5 rounded-lg bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/60 space-y-2.5 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-xs font-semibold text-slate-900 dark:text-white">
-                          <span className="font-mono text-teal-700 dark:text-teal-400 mr-1.5">
-                            Q{q.id}.
-                          </span>
-                          {q.text}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 shrink-0">
-                          {q.isPositive ? 'Positive Ease' : 'Complexity / Friction'}
-                        </span>
-                      </div>
-
-                      {/* 5-Point Likert Radio Matrix */}
-                      <div className="grid grid-cols-5 gap-2 text-center text-xs">
-                        {[1, 2, 3, 4, 5].map((val) => {
-                          const isSelected = currentVal === val;
-                          const labels = ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'];
-                          return (
-                            <button
-                              key={val}
-                              type="button"
-                              onClick={() => handleScoreChange(idx, val)}
-                              className={`py-2 px-1 rounded-md border text-xs font-medium cursor-pointer transition-all flex flex-col items-center justify-center gap-0.5 ${
-                                isSelected
-                                  ? 'bg-teal-700 text-white border-teal-700 dark:bg-teal-600 dark:border-teal-600 shadow-xs scale-102'
-                                  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-teal-500 hover:bg-teal-50/30'
-                              }`}
-                            >
-                              <span className="font-mono font-bold text-sm">{val}</span>
-                              <span className="text-[9px] line-clamp-1 opacity-90 hidden sm:block">
-                                {labels[val - 1]}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Right 5 Columns: Live SUS Gauge & Qualitative Debrief Submission */}
-            <div className="lg:col-span-5 space-y-5">
-              {/* Live SUS Gauge Card */}
-              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <Award className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                    Calculated Usability Assessment
-                  </h3>
-                  <span className="text-[11px] font-mono text-slate-500">Brooke (1996)</span>
-                </div>
-
-                {currentSus ? (
-                <>
-                <div className="p-4 rounded-xl bg-gradient-to-br from-teal-50/80 to-slate-50 dark:from-slate-800/60 dark:to-slate-900/40 border border-teal-200/60 dark:border-slate-700 text-center space-y-2">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-teal-800 dark:text-teal-300 block font-semibold">
-                    Composite SUS Usability Score
-                  </span>
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-5xl font-black font-mono text-slate-900 dark:text-white">
-                      {currentSus.totalScore}
-                    </span>
-                    <span className="text-lg font-bold text-slate-400">/ 100</span>
-                  </div>
-
-                  <div className="flex items-center justify-center gap-2 pt-1">
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-teal-700 text-white dark:bg-teal-600">
-                      Grade {currentSus.grade}
-                    </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                      {currentSus.adjectiveRating}
-                    </span>
-                    <span className="px-2.5 py-1 rounded-full text-xs font-mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      {currentSus.percentileBenchmark}th Percentile
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-600 dark:text-slate-400 pt-2 leading-relaxed max-w-sm mx-auto">
-                    {currentSus.totalScore >= 80.3
-                      ? 'Exceptional operational acceptance. System exceeds industry usability baseline.'
-                      : currentSus.totalScore >= 68.0
-                      ? 'Above acceptable industry threshold. Recommended for deployment.'
-                      : 'Marginal or sub-standard usability. Requires workflow simplification.'}
-                  </p>
-                </div>
-
-                {/* Odd vs Even items breakdown */}
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
-                  <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
-                    <span className="text-[10px] text-slate-400 block">Odd Items (Ease)</span>
-                    <span className="font-bold text-teal-700 dark:text-teal-400 text-sm">
-                      +{currentSus.oddSum} pts
-                    </span>
-                  </div>
-                  <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700">
-                    <span className="text-[10px] text-slate-400 block">Even Items (Low Friction)</span>
-                    <span className="font-bold text-teal-700 dark:text-teal-400 text-sm">
-                      +{currentSus.evenSum} pts
-                    </span>
-                  </div>
-                </div>
-                </>
-                ) : (
-                  <p className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                    Answer all 10 statements to see the score ({answeredCount}/10 answered).
-                  </p>
-                )}
-              </div>
-
-              {/* Qualitative Debrief Form */}
-              <form
-                onSubmit={handleSusSubmit}
-                className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs space-y-3.5 text-xs"
+          <div role="group" aria-label="Sections shown" className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-slate-500 dark:text-slate-400">Show:</span>
+            {SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                aria-pressed={show(section.id)}
+                onClick={() => toggleSection(section.id)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  show(section.id)
+                    ? 'border-teal-700 bg-teal-700 text-white'
+                    : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300'
+                }`}
               >
-                <div className="pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                    Supervisor Qualitative Debrief
-                  </h3>
-                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Record feedback about the handover process and ease of use.
-                  </span>
-                </div>
+                {section.label}
+              </button>
+            ))}
+          </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Supervisor Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={supervisorName}
-                      onChange={(e) => setSupervisorName(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                      Institutional Role
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={supervisorRole}
-                      onChange={(e) => setSupervisorRole(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Turnover Debrief Observations
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={debriefNotes}
-                    onChange={(e) => setDebriefNotes(e.target.value)}
-                    placeholder="e.g. SBAR structure cut transition duration from 25m to 12m. Zero communication gaps on high-acuity consignments."
-                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 leading-relaxed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Operational Bottlenecks / Floor Friction
-                  </label>
-                  <input
-                    type="text"
-                    value={bottlenecks}
-                    onChange={(e) => setBottlenecks(e.target.value)}
-                    placeholder="e.g. Physical walk-through for forklift battery fobs delayed by 5 mins."
-                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Dual Signoff & Approval Feedback
-                  </label>
-                  <input
-                    type="text"
-                    value={signoffFeedback}
-                    onChange={(e) => setSignoffFeedback(e.target.value)}
-                    placeholder="e.g. Cryptographic SHA-256 seal provided clear accountability between crews."
-                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100"
-                  />
-                </div>
-
-                {hasSubmitted && (
-                  <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Supervisor debrief evaluation recorded and archived successfully.</span>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {show('trend') && (
+              <div className="lg:col-span-2">
+                <ChartCard title="Handovers per month" subtitle="Hover or tab to a bar for the exact count">
+                  <ColumnChart data={monthly} valueNoun="handovers" emptyMessage="No handovers have been recorded yet." />
+                </ChartCard>
+              </div>
+            )}
+            {show('shifts') && (
+              <ChartCard title="Handovers by shift" subtitle="How the workload is spread across the day">
+                <BarList data={toRows(stats.handoversByShift, SHIFT_LABELS)} emptyMessage="No handovers have been recorded yet." />
+                {Object.keys(transition.averageByShift).length > 0 && (
+                  <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
+                    <p className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">Average handover time</p>
+                    <BarList data={toRows(transition.averageByShift, SHIFT_LABELS)} unit=" min" showShare={false} emptyMessage="" />
                   </div>
                 )}
-
-                <button
-                  type="submit"
-                  disabled={!currentSus}
-                  className="w-full py-2.5 px-4 bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white font-semibold rounded-lg cursor-pointer transition-colors shadow-xs flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Submit Debrief Evaluation</span>
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {/* Historical Supervisor Evaluations Ledger */}
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  Historical Supervisor Usability Debrief Log
-                </h3>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Standardized System Usability Scale field test evaluations ({susEvaluations.length} records)
-                </span>
-              </div>
-              <span className="text-xs font-mono font-semibold text-teal-700 dark:text-teal-400">
-                Institutional Average: {institutionalAvgSus} / 100
-              </span>
-            </div>
-
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {susEvaluations.length === 0 ? (
-                <div className="py-8 text-center text-xs text-slate-400">
-                  No usability evaluations logged yet. Complete the form above to submit an evaluation.
-                </div>
-              ) : (
-                susEvaluations.map((ev) => (
-                  <div key={ev.id} className="p-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors space-y-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <span className="px-2 py-0.5 rounded text-xs font-bold font-mono bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300">
-                        {ev.totalScore} / 100 (Grade {ev.grade})
-                      </span>
-                      <span className="font-semibold text-xs text-slate-900 dark:text-white">
-                        {ev.supervisorName}
-                      </span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        · {ev.supervisorRole}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                      <span>{ev.shiftCode || 'Active Shift'}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{ev.timestamp}</span>
-                    </div>
-                  </div>
-
-                  {ev.debriefNotes && (
-                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                      <strong className="text-slate-900 dark:text-slate-200 font-semibold">Debrief: </strong>
-                      {ev.debriefNotes}
-                    </p>
-                  )}
-
-                  {(ev.operationalBottlenecks || ev.signoffVerificationFeedback) && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] pt-1">
-                      {ev.operationalBottlenecks && (
-                        <div className="p-2 rounded bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">Bottlenecks: </span>
-                          {ev.operationalBottlenecks}
-                        </div>
-                      )}
-                      {ev.signoffVerificationFeedback && (
-                        <div className="p-2 rounded bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400">
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">Signoff Attestation: </span>
-                          {ev.signoffVerificationFeedback}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
+              </ChartCard>
             )}
-            </div>
+            {show('status') && (
+              <ChartCard title="Where handovers stand" subtitle="Each handover is in exactly one of these stages">
+                <BarList data={toRows(stats.handoversByStatus, STATUS_LABELS)} emptyMessage="No handovers have been recorded yet." />
+              </ChartCard>
+            )}
+            {show('tasks') && (
+              <ChartCard
+                title="Tasks"
+                subtitle={taskTotal > 0
+                  ? `${percent(stats.tasksByStatus.carried_over ?? 0, taskTotal)} of ${taskTotal.toLocaleString()} tasks were carried over to the next shift`
+                  : 'Follow-up work recorded against shifts'}
+              >
+                <BarList data={toRows(stats.tasksByStatus, TASK_LABELS)} emptyMessage="No tasks have been recorded yet." />
+              </ChartCard>
+            )}
+            {show('assistant') && (
+              <div className={show('tasks') ? '' : 'lg:col-span-2'}>
+                <AdminStatisticsAssistant statistics={stats} />
+              </div>
+            )}
           </div>
-        </div>
+        </>
+      ) : (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-slate-200 p-5 dark:border-slate-800">
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Sign-off records</h2>
+            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Handovers signed by both the outgoing and the incoming staff member.</p>
+          </div>
+          {useDemoData ? (
+            <p className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
+              Demo data only generates totals, so there are no individual records to list. Switch to live data to see them.
+            </p>
+          ) : complianceRecords.length === 0 ? (
+            <p className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">No handover has been signed by both staff members yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-300">
+                    <th scope="col" className="px-5 py-3 font-semibold">Handover</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Work area</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Outgoing</th>
+                    <th scope="col" className="px-5 py-3 font-semibold">Incoming</th>
+                    <th scope="col" className="px-5 py-3 text-right font-semibold">Time taken</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {complianceRecords.map((record) => (
+                    <tr key={record.id}>
+                      <td className="px-5 py-3">
+                        <span className="font-mono font-semibold text-slate-900 dark:text-white">{record.handoverCode}</span>
+                        <span className="block text-xs text-slate-500">{record.date} · <span className="capitalize">{record.shiftType}</span></span>
+                      </td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{record.departmentName}</td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{record.outgoingSigner}<span className="block text-xs text-slate-500">{record.outgoingSignedAt}</span></td>
+                      <td className="px-5 py-3 text-slate-700 dark:text-slate-300">{record.incomingSigner}<span className="block text-xs text-slate-500">{record.incomingSignedAt}</span></td>
+                      <td className="px-5 py-3 text-right tabular-nums text-slate-900 dark:text-white">{record.timeDeltaMinutes} min</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       )}
     </div>
   );
 };
-
