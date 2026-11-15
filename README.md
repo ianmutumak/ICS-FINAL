@@ -17,8 +17,8 @@ University.
 - **Approve:** an administrator approves the signed handover. It is archived and
   the next shift opens with open items carried over.
 - **Administer:** manage users, facility zones, incidents and the override log.
-- **Measure:** statistics on handovers, a System Usability Scale (SUS) survey,
-  and an assistant that answers questions about the aggregate figures.
+- **Measure:** statistics and charts on handovers, with an assistant that
+  answers questions about the figures.
 
 ## Tech stack
 
@@ -52,6 +52,22 @@ npm run dev
 
 The app runs at http://localhost:3000 and the API at http://localhost:3004.
 
+## Statistics and the assistant
+
+The Statistics screen shows headline figures and charts, and each chart section
+can be switched on or off. A **Live data / Demo data** switch replaces every
+figure with 5,000 generated handovers for testing and presentations. Demo data
+is labelled on screen, is the same on every device, and is never written to the
+database.
+
+The assistant answers questions about whatever figures are on screen:
+
+- The server works out every figure and passes it to the model as plain
+  sentences, so the model quotes numbers rather than calculating them.
+- The model is loaded when the server starts and reads the current figures when
+  the page opens, so answers start streaming in under a second.
+- `OLLAMA_KEEP_ALIVE` (default `30m`) controls how long the model stays in memory.
+
 ## Scripts
 
 | Script | What it does |
@@ -75,7 +91,7 @@ src/
     dashboard/             The handover screen
     modals/                Start shift, add update, review and sign
     admin/                 Admin console
-    analytics/             Statistics, SUS survey, assistant
+    analytics/             Statistics, charts, assistant
     layout/, common/       Header and icons
   context/
     HandoverContext.tsx    Combines the modules below into one provider

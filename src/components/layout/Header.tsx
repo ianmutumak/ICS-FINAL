@@ -21,7 +21,7 @@ export const Header: React.FC = () => {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <button onClick={() => setActiveTab('active-handover')} className="flex items-center gap-2.5 rounded-lg text-left">
           <ZamuLogoIcon className="h-8 w-8 text-teal-700 dark:text-teal-400" />
-          <span className="font-[family-name:var(--font-display)] text-lg font-bold tracking-tight text-slate-900 dark:text-white">
+          <span className={`whitespace-nowrap font-[family-name:var(--font-display)] text-lg font-bold tracking-tight text-slate-900 dark:text-white ${isAdmin ? 'hidden sm:inline' : ''}`}>
             Zamu-Check
           </span>
         </button>
@@ -46,7 +46,8 @@ export const Header: React.FC = () => {
         )}
 
         <div className="flex items-center gap-3">
-          <div className="hidden text-right leading-tight sm:block">
+          {/* With the admin navigation in the bar there is less room, so the name appears later. */}
+          <div className={`hidden whitespace-nowrap text-right leading-tight ${isAdmin ? 'lg:block' : 'sm:block'}`}>
             <p className="text-sm font-semibold text-slate-900 dark:text-white">{currentUser.name}</p>
             <p className="max-w-[220px] truncate text-xs text-slate-500 dark:text-slate-400">
               {isAdmin ? 'Administrator' : currentUser.role || 'Staff member'}
@@ -57,10 +58,11 @@ export const Header: React.FC = () => {
           </span>
           <button
             onClick={signOutUser}
+            aria-label="Sign out"
             className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Sign out</span>
+            <span className={`hidden whitespace-nowrap ${isAdmin ? 'lg:inline' : 'sm:inline'}`}>Sign out</span>
           </button>
         </div>
       </div>
