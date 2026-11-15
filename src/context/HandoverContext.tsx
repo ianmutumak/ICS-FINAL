@@ -185,10 +185,10 @@ interface HandoverContextType {
 
 const HandoverContext = createContext<HandoverContextType | undefined>(undefined);
 
-// Purge legacy storage caches (v1 to v5 templates)
+// Purge legacy storage caches (v1 to v6 templates)
 try {
   if (typeof window !== 'undefined' && window.localStorage) {
-    const legacyVersions = ['_v1', '_v2', '_v3', '_v4', 'templates'];
+    const legacyVersions = ['_v1', '_v2', '_v3', '_v4', '_v5', '_v6', 'templates'];
     Object.keys(localStorage).forEach((key) => {
       if (key.startsWith('zamu_') && legacyVersions.some((ver) => key.includes(ver))) {
         localStorage.removeItem(key);
@@ -199,18 +199,18 @@ try {
   // ignore
 }
 
-const STORAGE_ACTIVE_KEY = 'zamu_active_shift_v6';
-const STORAGE_TASKS_KEY = 'zamu_tasks_v6';
-const STORAGE_USER_KEY = 'zamu_current_user_v6';
-const STORAGE_STAFF_KEY = 'zamu_staff_list_v6';
-const STORAGE_DEPTS_KEY = 'zamu_departments_v6';
-const STORAGE_THEME_KEY = 'zamu_theme_v6';
-const STORAGE_INCIDENTS_KEY = 'zamu_incidents_v6';
-const STORAGE_OVERRIDES_KEY = 'zamu_overrides_v6';
-const STORAGE_AUTH_KEY = 'zamu_is_authenticated_v6';
-const STORAGE_CLEARANCE_KEY = 'zamu_admin_clearance_v6';
-const STORAGE_CATEGORIES_KEY = 'zamu_categories_v6';
-const STORAGE_SUS_KEY = 'zamu_sus_evaluations_v6';
+const STORAGE_ACTIVE_KEY = 'zamu_active_shift_v7';
+const STORAGE_TASKS_KEY = 'zamu_tasks_v7';
+const STORAGE_USER_KEY = 'zamu_current_user_v7';
+const STORAGE_STAFF_KEY = 'zamu_staff_list_v7';
+const STORAGE_DEPTS_KEY = 'zamu_departments_v7';
+const STORAGE_THEME_KEY = 'zamu_theme_v7';
+const STORAGE_INCIDENTS_KEY = 'zamu_incidents_v7';
+const STORAGE_OVERRIDES_KEY = 'zamu_overrides_v7';
+const STORAGE_AUTH_KEY = 'zamu_is_authenticated_v7';
+const STORAGE_CLEARANCE_KEY = 'zamu_admin_clearance_v7';
+const STORAGE_CATEGORIES_KEY = 'zamu_categories_v7';
+const STORAGE_SUS_KEY = 'zamu_sus_evaluations_v7';
 
 
 export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -932,9 +932,9 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       shiftWindow: activeHandover.shiftType === 'night' ? '07:00 - 19:30 EAT' : '19:00 - 07:30 EAT',
       status: 'in_progress',
       leadOutgoing: activeHandover.leadIncoming,
-      leadIncoming: SEED_STAFF[2] || SEED_STAFF[0],
-      attendanceCount: 6,
-      transitionDurationMinutes: 15,
+      leadIncoming: SEED_STAFF[1] || SEED_STAFF[0],
+      attendanceCount: 1,
+      transitionDurationMinutes: 0,
       summaryNotes: 'Shift initiated. All unresolved items from prior shift rolled over automatically.',
       cases: activeHandover.cases.map((c) => ({ ...c, lastUpdated: '07:05 AM' })),
       equipment: activeHandover.equipment.map((eq) => ({ ...eq, custodyChecked: false })),
@@ -944,9 +944,9 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         outgoingStaffName: activeHandover.leadIncoming.name,
         outgoingRole: activeHandover.leadIncoming.role,
         outgoingConfirmed: false,
-        incomingStaffId: SEED_STAFF[2]?.id || 'usr-003',
-        incomingStaffName: SEED_STAFF[2]?.name || 'Brian Mutua',
-        incomingRole: SEED_STAFF[2]?.role || 'Operations Lead',
+        incomingStaffId: SEED_STAFF[1]?.id || SEED_STAFF[0].id,
+        incomingStaffName: SEED_STAFF[1]?.name || SEED_STAFF[0].name,
+        incomingRole: SEED_STAFF[1]?.role || SEED_STAFF[0].role,
         incomingConfirmed: false,
       },
       createdAt: nowIso,

@@ -62,18 +62,18 @@ export const StatisticsAnalyticsView: React.FC = () => {
   const avgDuration =
     completedHandovers.length > 0
       ? Math.round(
-          completedHandovers.reduce((acc, h) => acc + (h.transitionDurationMinutes || 18), 0) /
+          completedHandovers.reduce((acc, h) => acc + (h.transitionDurationMinutes || 0), 0) /
             completedHandovers.length
         )
-      : 18;
+      : 0;
 
   const totalTasks = tasks.length;
   const carriedOverTasks = tasks.filter((t) => t.carriedOverFromPrevious).length;
-  const carryOverRate = totalTasks > 0 ? ((carriedOverTasks / totalTasks) * 100).toFixed(1) : '14.2';
+  const carryOverRate = totalTasks > 0 ? ((carriedOverTasks / totalTasks) * 100).toFixed(1) : '0.0';
 
   const punctualCount = attendanceLogs.filter((a) => a.punctual).length;
   const attendanceRate =
-    attendanceLogs.length > 0 ? Math.round((punctualCount / attendanceLogs.length) * 100) : 94;
+    attendanceLogs.length > 0 ? Math.round((punctualCount / attendanceLogs.length) * 100) : 0;
 
   const avgCompliance =
     complianceRecords.length > 0
@@ -81,7 +81,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
           complianceRecords.reduce((acc, c) => acc + c.complianceScore, 0) /
             complianceRecords.length
         )
-      : 99;
+      : 0;
 
   // SUS Algorithm (Brooke, 1996)
   const calculateCurrentSus = () => {
@@ -159,18 +159,15 @@ export const StatisticsAnalyticsView: React.FC = () => {
           susEvaluations.reduce((acc, s) => acc + s.totalScore, 0) /
           susEvaluations.length
         ).toFixed(1)
-      : '86.7';
+      : '0.0';
 
-  // Mock shift duration trend bars
-  const shiftTrendData = [
-    { code: 'KQ-IMP-N08', duration: 18, target: 20, shift: 'Night' },
-    { code: 'KQ-EXP-D07', duration: 16, target: 20, shift: 'Day' },
-    { code: 'KQ-COLD-N06', duration: 21, target: 20, shift: 'Night' },
-    { code: 'KQ-IMP-D05', duration: 14, target: 20, shift: 'Day' },
-    { code: 'KQ-EXP-N04', duration: 17, target: 20, shift: 'Night' },
-    { code: 'KQ-XDK-M12', duration: 12, target: 20, shift: 'Morning' },
-    { code: 'KQ-HAZ-M05', duration: 15, target: 20, shift: 'Morning' },
-  ];
+  // Shift duration trends from actual completed handovers
+  const shiftTrendData = completedHandovers.map((h) => ({
+    code: h.handoverCode,
+    duration: h.transitionDurationMinutes || 0,
+    target: 20,
+    shift: h.shiftType.charAt(0).toUpperCase() + h.shiftType.slice(1),
+  }));
 
   return (
     <div className="space-y-6">
@@ -342,42 +339,49 @@ export const StatisticsAnalyticsView: React.FC = () => {
 
             {/* Visual Bars */}
             <div className="space-y-3 pt-2">
-              {shiftTrendData.map((s) => {
-                const isUnderTarget = s.duration <= s.target;
-                const percentage = Math.min(100, Math.round((s.duration / 30) * 100));
-                return (
-                  <div key={s.code} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold text-slate-900 dark:text-white">
-                          {s.code}
+              {shiftTrendData.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  <Clock className="w-6 h-6 mx-auto mb-1.5 opacity-40" />
+                  <p>No completed handover cycles recorded yet.</p>
+                </div>
+              ) : (
+                shiftTrendData.map((s) => {
+                  const isUnderTarget = s.duration <= s.target;
+                  const percentage = Math.min(100, Math.round((s.duration / 30) * 100));
+                  return (
+                    <div key={s.code} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-semibold text-slate-900 dark:text-white">
+                            {s.code}
+                          </span>
+                          <span className="text-[11px] text-slate-500">· {s.shift} Duty</span>
+                        </div>
+                        <span
+                          className={`font-mono font-bold ${
+                            isUnderTarget
+                              ? 'text-emerald-700 dark:text-emerald-400'
+                              : 'text-amber-600 dark:text-amber-400'
+                          }`}
+                        >
+                          {s.duration} mins
                         </span>
-                        <span className="text-[11px] text-slate-500">· {s.shift} Duty</span>
                       </div>
-                      <span
-                        className={`font-mono font-bold ${
-                          isUnderTarget
-                            ? 'text-emerald-700 dark:text-emerald-400'
-                            : 'text-amber-600 dark:text-amber-400'
-                        }`}
-                      >
-                        {s.duration} mins
-                      </span>
-                    </div>
 
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden flex">
-                      <div
-                        style={{ width: `${percentage}%` }}
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          isUnderTarget
-                            ? 'bg-teal-600 dark:bg-teal-500'
-                            : 'bg-amber-500 dark:bg-amber-400'
-                        }`}
-                      />
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden flex">
+                        <div
+                          style={{ width: `${percentage}%` }}
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            isUnderTarget
+                              ? 'bg-teal-600 dark:bg-teal-500'
+                              : 'bg-amber-500 dark:bg-amber-400'
+                          }`}
+                        />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
 
             <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 mt-4">
@@ -451,8 +455,15 @@ export const StatisticsAnalyticsView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {attendanceLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                {attendanceLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                      No attendance audit records logged yet
+                    </td>
+                  </tr>
+                ) : (
+                  attendanceLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                     <td className="py-2.5 px-4 font-medium text-slate-900 dark:text-white">
                       {log.staffName}
                     </td>
@@ -483,7 +494,8 @@ export const StatisticsAnalyticsView: React.FC = () => {
                       )}
                     </td>
                   </tr>
-                ))}
+                ))
+              )}
               </tbody>
             </table>
           </div>
@@ -521,8 +533,15 @@ export const StatisticsAnalyticsView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {complianceRecords.map((cmp) => (
-                  <tr key={cmp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                {complianceRecords.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-slate-400">
+                      No sign-off compliance records logged yet
+                    </td>
+                  </tr>
+                ) : (
+                  complianceRecords.map((cmp) => (
+                    <tr key={cmp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                     <td className="py-2.5 px-4 font-mono font-bold text-teal-700 dark:text-teal-400">
                       {cmp.handoverCode}
                     </td>
@@ -549,7 +568,8 @@ export const StatisticsAnalyticsView: React.FC = () => {
                       </span>
                     </td>
                   </tr>
-                ))}
+                ))
+              )}
               </tbody>
             </table>
           </div>
@@ -865,8 +885,13 @@ export const StatisticsAnalyticsView: React.FC = () => {
             </div>
 
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {susEvaluations.map((ev) => (
-                <div key={ev.id} className="p-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors space-y-2">
+              {susEvaluations.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  No usability evaluations logged yet. Complete the form above to submit an evaluation.
+                </div>
+              ) : (
+                susEvaluations.map((ev) => (
+                  <div key={ev.id} className="p-4 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors space-y-2">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5">
                       <span className="px-2 py-0.5 rounded text-xs font-bold font-mono bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300">
@@ -911,7 +936,8 @@ export const StatisticsAnalyticsView: React.FC = () => {
                     </div>
                   )}
                 </div>
-              ))}
+              ))
+            )}
             </div>
           </div>
         </div>

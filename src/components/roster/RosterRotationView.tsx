@@ -205,29 +205,35 @@ export const RosterRotationView: React.FC<RosterRotationViewProps> = ({
                 </div>
 
                 <div className="space-y-1.5">
-                  {shift.staff.map((staff) => (
-                    <div
-                      key={staff.id}
-                      className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs flex items-center justify-between gap-2"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[9px] font-bold flex items-center justify-center shrink-0">
-                          {staff.name.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <span className="font-semibold text-slate-900 dark:text-white block truncate text-[11px]">
-                            {staff.name}
-                          </span>
-                          <span className="text-[10px] text-slate-400 block truncate">
-                            {staff.role}
-                          </span>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                        {staff.staffNumber}
-                      </span>
+                  {shift.staff.length === 0 ? (
+                    <div className="py-4 text-center text-[11px] text-slate-400 dark:text-slate-500 italic">
+                      No crew assigned
                     </div>
-                  ))}
+                  ) : (
+                    shift.staff.map((staff) => (
+                      <div
+                        key={staff.id}
+                        className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs flex items-center justify-between gap-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[9px] font-bold flex items-center justify-center shrink-0">
+                            {staff.name.charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-semibold text-slate-900 dark:text-white block truncate text-[11px]">
+                              {staff.name}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block truncate">
+                              {staff.role}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                          {staff.staffNumber}
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             );
