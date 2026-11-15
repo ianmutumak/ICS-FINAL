@@ -660,8 +660,14 @@ export const AdminConsoleView: React.FC = () => {
 
           {/* Incident Cards */}
           <div className="space-y-3">
-            {incidents.map((inc) => {
-              const isResolved = inc.status === 'resolved';
+            {incidents.length === 0 ? (
+              <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-400">
+                <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p className="font-medium text-xs">No active or historical incidents recorded</p>
+              </div>
+            ) : (
+              incidents.map((inc) => {
+                const isResolved = inc.status === 'resolved';
               return (
                 <div
                   key={inc.id}
@@ -723,8 +729,9 @@ export const AdminConsoleView: React.FC = () => {
                   </div>
                 </div>
               );
-            })}
-          </div>
+            })
+          )}
+        </div>
         </div>
       )}
 
@@ -821,28 +828,36 @@ export const AdminConsoleView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {overrideLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                    <td className="py-2.5 px-4 font-mono font-bold text-teal-700 dark:text-teal-400">
-                      {log.shiftCode}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-900 dark:text-white">
-                      {log.departmentName}
-                    </td>
-                    <td className="py-2.5 px-4 font-medium text-slate-800 dark:text-slate-200">
-                      {log.adminName}
-                    </td>
-                    <td className="py-2.5 px-4 font-mono text-[11px] text-rose-700 dark:text-rose-400">
-                      {log.actionType}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300 max-w-xs leading-relaxed">
-                      "{log.reason}"
-                    </td>
-                    <td className="py-2.5 px-4 font-mono tabular-nums text-slate-500 text-right">
-                      {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {overrideLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      No administrative overrides recorded
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  overrideLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                      <td className="py-2.5 px-4 font-mono font-bold text-teal-700 dark:text-teal-400">
+                        {log.shiftCode}
+                      </td>
+                      <td className="py-2.5 px-4 text-slate-900 dark:text-white">
+                        {log.departmentName}
+                      </td>
+                      <td className="py-2.5 px-4 font-medium text-slate-800 dark:text-slate-200">
+                        {log.adminName}
+                      </td>
+                      <td className="py-2.5 px-4 font-mono text-[11px] text-rose-700 dark:text-rose-400">
+                        {log.actionType}
+                      </td>
+                      <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300 max-w-xs leading-relaxed">
+                        "{log.reason}"
+                      </td>
+                      <td className="py-2.5 px-4 font-mono tabular-nums text-slate-500 text-right">
+                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

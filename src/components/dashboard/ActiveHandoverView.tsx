@@ -569,38 +569,44 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
             )}
 
             <div className="space-y-1.5">
-              {activeHandover.equipment.map((eq) => (
-                <div
-                  key={eq.id}
-                  onClick={() => toggleEquipmentCustody(eq.id)}
-                  className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                    eq.custodyChecked
-                      ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
-                      : 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    {eq.custodyChecked ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    ) : (
-                      <Circle className="w-4 h-4 text-slate-300 shrink-0" />
-                    )}
-                    <div className="min-w-0">
-                      <span className="text-xs font-semibold text-slate-900 dark:text-white block truncate">
-                        {eq.name}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {eq.assetTag} · {eq.status.replace('_', ' ')}
-                      </span>
-                    </div>
-                  </div>
-                  {eq.batteryPercent !== undefined && (
-                    <span className="text-[10px] font-mono text-slate-500 shrink-0">
-                      {eq.batteryPercent}%
-                    </span>
-                  )}
+              {activeHandover.equipment.length === 0 ? (
+                <div className="py-4 text-center text-[11px] text-slate-400 dark:text-slate-500">
+                  No equipment logged for custody
                 </div>
-              ))}
+              ) : (
+                activeHandover.equipment.map((eq) => (
+                  <div
+                    key={eq.id}
+                    onClick={() => toggleEquipmentCustody(eq.id)}
+                    className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                      eq.custodyChecked
+                        ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
+                        : 'bg-slate-50 dark:bg-slate-800/30 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {eq.custodyChecked ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      ) : (
+                        <Circle className="w-4 h-4 text-slate-300 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <span className="text-xs font-semibold text-slate-900 dark:text-white block truncate">
+                          {eq.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {eq.assetTag} · {eq.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                    {eq.batteryPercent !== undefined && (
+                      <span className="text-[10px] font-mono text-slate-500 shrink-0">
+                        {eq.batteryPercent}%
+                      </span>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -674,47 +680,53 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
             )}
 
             <div className="space-y-1.5">
-              {activeHandover.actions.map((act) => {
-                const isCompleted = act.status === 'completed';
-                return (
-                  <div
-                    key={act.id}
-                    onClick={() => toggleTaskStatus(act.id)}
-                    className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-start gap-2.5 ${
-                      isCompleted
-                        ? 'bg-slate-50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800 opacity-60'
-                        : act.priority === 'urgent'
-                        ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60'
-                        : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
-                    }`}
-                  >
-                    <div className="pt-0.5">
-                      {isCompleted ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                      ) : (
-                        <Circle className="w-4 h-4 text-slate-300 shrink-0" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className={`text-xs font-medium text-slate-900 dark:text-white leading-snug ${
-                          isCompleted ? 'line-through text-slate-400' : ''
-                        }`}
-                      >
-                        {act.title}
-                      </p>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
-                        <span className="font-mono">{act.dueTime}</span>
-                        <span>·</span>
-                        <span>{act.assignedTo}</span>
-                        {act.carriedOverFromPrevious && (
-                          <span className="text-amber-600 font-semibold">· Rolled Over</span>
+              {activeHandover.actions.length === 0 ? (
+                <div className="py-4 text-center text-[11px] text-slate-400 dark:text-slate-500">
+                  No pending action items
+                </div>
+              ) : (
+                activeHandover.actions.map((act) => {
+                  const isCompleted = act.status === 'completed';
+                  return (
+                    <div
+                      key={act.id}
+                      onClick={() => toggleTaskStatus(act.id)}
+                      className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-start gap-2.5 ${
+                        isCompleted
+                          ? 'bg-slate-50 dark:bg-slate-800/20 border-slate-200 dark:border-slate-800 opacity-60'
+                          : act.priority === 'urgent'
+                          ? 'bg-rose-50/40 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/60'
+                          : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800'
+                      }`}
+                    >
+                      <div className="pt-0.5">
+                        {isCompleted ? (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Circle className="w-4 h-4 text-slate-300 shrink-0" />
                         )}
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className={`text-xs font-medium text-slate-900 dark:text-white leading-snug ${
+                            isCompleted ? 'line-through text-slate-400' : ''
+                          }`}
+                        >
+                          {act.title}
+                        </p>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                          <span className="font-mono">{act.dueTime}</span>
+                          <span>·</span>
+                          <span>{act.assignedTo}</span>
+                          {act.carriedOverFromPrevious && (
+                            <span className="text-amber-600 font-semibold">· Rolled Over</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

@@ -89,7 +89,14 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onStartNewShiftClick }
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredHandovers.map((h) => {
+              {filteredHandovers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-slate-400">
+                    No handover records found
+                  </td>
+                </tr>
+              ) : (
+                filteredHandovers.map((h) => {
                 const isSigned = h.signoff.outgoingConfirmed && h.signoff.incomingConfirmed;
                 return (
                   <tr
@@ -139,7 +146,8 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onStartNewShiftClick }
                     </td>
                   </tr>
                 );
-              })}
+              })
+            )}
             </tbody>
           </table>
         </div>
