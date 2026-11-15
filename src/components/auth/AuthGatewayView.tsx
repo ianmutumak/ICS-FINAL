@@ -1,41 +1,28 @@
 import React, { useState } from 'react';
-import { useHandover, MASTER_ADMIN_PASSKEY } from '../../context/HandoverContext';
+import { useHandover } from '../../context/HandoverContext';
 import { ZamuLogoIcon } from '../common/CustomSvgIcons';
 import {
   Lock,
-  KeyRound,
   LogIn,
   AlertCircle,
-  Sparkles,
   User,
-  ShieldCheck,
-  Building2,
-  Briefcase,
-  Award,
   Hash,
 } from 'lucide-react';
-import { loginWithGoogle } from '../../lib/firebase';
 
 export const AuthGatewayView: React.FC = () => {
-  const { signInUser, signUpUser, departments } = useHandover();
+  const { signInUser, signUpUser } = useHandover();
 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
 
   // Sign In State
   const [staffNumberInput, setStaffNumberInput] = useState('');
   const [pinInput, setPinInput] = useState('');
-  const [enableAdminClearance, setEnableAdminClearance] = useState(false);
-  const [adminPasskeyInput, setAdminPasskeyInput] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
   // Sign Up State
   const [fullName, setFullName] = useState('');
   const [newStaffNumber, setNewStaffNumber] = useState('');
-  const [department, setDepartment] = useState(departments[0]?.name || 'KQ Import Bonded Freight Warehouse');
-  const [role, setRole] = useState('Shift Operations Lead');
-  const [qualification, setQualification] = useState('IATA Cargo / MHE Certified');
   const [newPin, setNewPin] = useState('');
-  const [signupAdminPasskey, setSignupAdminPasskey] = useState('');
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,11 +35,7 @@ export const AuthGatewayView: React.FC = () => {
       setErrorMessage('PIN must be at least 4 digits.');
       return;
     }
-    const res = signInUser(
-      staffNumberInput.trim(),
-      pinInput.trim(),
-      enableAdminClearance ? adminPasskeyInput.trim() : undefined
-    );
+    const res = signInUser(staffNumberInput.trim(), pinInput.trim());
     if (!res.success) {
       setErrorMessage(res.error || 'Authentication failed. Please verify credentials.');
     }
@@ -78,41 +61,14 @@ export const AuthGatewayView: React.FC = () => {
       {
         name: fullName.trim(),
         staffNumber: newStaffNumber.trim().toUpperCase(),
-        department,
-        role,
-        qualification: qualification.trim(),
+        department: '',
+        role: 'Staff member',
+        qualification: '',
         pin: newPin.trim(),
-      },
-      signupAdminPasskey.trim() || undefined
+      }
     );
     if (!res.success) {
       setErrorMessage(res.error || 'Registration failed. Please try again.');
-    }
-  };
-
-  // Quick profile shortcuts
-  const autofillStaff = () => {
-    setStaffNumberInput('KQ-OPS-9204');
-    setPinInput('1234');
-    setEnableAdminClearance(false);
-    setAdminPasskeyInput('');
-    setErrorMessage('');
-  };
-
-  const autofillAdmin = () => {
-    setStaffNumberInput('KQ-SUP-8841');
-    setPinInput('1234');
-    setEnableAdminClearance(true);
-    setAdminPasskeyInput(MASTER_ADMIN_PASSKEY);
-    setErrorMessage('');
-  };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      await loginWithGoogle();
-      signInUser('KQ-SUP-8841', '1234', MASTER_ADMIN_PASSKEY);
-    } catch (err) {
-      console.warn('Google Auth notice:', err);
     }
   };
 
@@ -131,7 +87,7 @@ export const AuthGatewayView: React.FC = () => {
             ZAMU-CHECK
           </h1>
           <p className="text-xs text-slate-400">
-            Kenya Airways Cargo · Shift Turnover & Governance
+            Shift handover management
           </p>
         </div>
 
@@ -183,7 +139,7 @@ export const AuthGatewayView: React.FC = () => {
                   required
                   value={staffNumberInput}
                   onChange={(e) => setStaffNumberInput(e.target.value)}
-                  placeholder="KQ-OPS-9204"
+                  placeholder="Enter your staff ID"
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
               </div>
@@ -204,34 +160,6 @@ export const AuthGatewayView: React.FC = () => {
                   placeholder="4-digit PIN"
                   className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500"
                 />
-              </div>
-
-              {/* Supervisor Clearance */}
-              <div>
-                <label className="flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-200">
-                  <input
-                    type="checkbox"
-                    checked={enableAdminClearance}
-                    onChange={(e) => setEnableAdminClearance(e.target.checked)}
-                    className="rounded border-slate-700 text-teal-600 focus:ring-teal-500 cursor-pointer"
-                  />
-                  <span className="text-[11px] font-medium flex items-center gap-1">
-                    <KeyRound className="w-3 h-3 text-amber-400" />
-                    Supervisor Clearance Passkey
-                  </span>
-                </label>
-
-                {enableAdminClearance && (
-                  <div className="mt-2 p-2.5 rounded-xl bg-slate-900/80 border border-amber-900/50 space-y-1">
-                    <input
-                      type="password"
-                      value={adminPasskeyInput}
-                      onChange={(e) => setAdminPasskeyInput(e.target.value)}
-                      placeholder="Supervisor Passkey"
-                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
-                    />
-                  </div>
-                )}
               </div>
 
               <button
@@ -273,7 +201,7 @@ export const AuthGatewayView: React.FC = () => {
                     required
                     value={newStaffNumber}
                     onChange={(e) => setNewStaffNumber(e.target.value)}
-                    placeholder="KQ-OPS-2051"
+                    placeholder="Enter your staff ID"
                     className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
                   />
                 </div>
@@ -296,67 +224,6 @@ export const AuthGatewayView: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Operational Zone</span>
-                </label>
-                <select
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
-                >
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.name}>
-                      {d.name} ({d.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1">
-                    <Briefcase className="w-3 h-3 text-slate-400" />
-                    <span>Role</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    placeholder="Operations Lead"
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1">
-                    <Award className="w-3 h-3 text-slate-400" />
-                    <span>Certification</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={qualification}
-                    onChange={(e) => setQualification(e.target.value)}
-                    placeholder="IATA Cargo"
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white text-xs"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-slate-400 font-medium mb-1 flex items-center gap-1">
-                  <KeyRound className="w-3 h-3 text-amber-400" />
-                  <span>Supervisor Passkey (Optional)</span>
-                </label>
-                <input
-                  type="password"
-                  value={signupAdminPasskey}
-                  onChange={(e) => setSignupAdminPasskey(e.target.value)}
-                  placeholder="Clearance passkey"
-                  className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
-                />
-              </div>
-
               <button
                 type="submit"
                 className="w-full py-2.5 px-4 font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors cursor-pointer shadow-lg text-xs mt-1"
@@ -366,57 +233,6 @@ export const AuthGatewayView: React.FC = () => {
             </form>
           )}
 
-          {/* Quick Access Profiles */}
-          <div className="pt-2.5 border-t border-slate-800/80 space-y-1.5">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block text-center">
-              Quick Test Profiles
-            </span>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={autofillStaff}
-                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition-colors cursor-pointer flex items-center gap-2"
-              >
-                <User className="w-4 h-4 text-teal-400 shrink-0" />
-                <div className="min-w-0">
-                  <span className="text-[11px] font-semibold text-slate-200 block truncate">
-                    Ramp Lead
-                  </span>
-                  <span className="text-[9px] text-slate-400 font-mono block truncate">
-                    KQ-OPS-9204
-                  </span>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={autofillAdmin}
-                className="p-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-amber-900/60 text-left transition-colors cursor-pointer flex items-center gap-2"
-              >
-                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
-                <div className="min-w-0">
-                  <span className="text-[11px] font-semibold text-amber-300 block truncate">
-                    Supervisor
-                  </span>
-                  <span className="text-[9px] text-slate-400 font-mono block truncate">
-                    KQ-SUP-8841
-                  </span>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Google Sign In option */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="w-full py-2 px-3 rounded-xl border border-slate-800 hover:bg-slate-900 text-slate-300 text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-              <span>Google Sign-In</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>

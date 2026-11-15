@@ -54,7 +54,7 @@ export const AdminConsoleView: React.FC = () => {
 
   // Override dialog state
   const [selectedShiftToOverride, setSelectedShiftToOverride] = useState<string | null>(null);
-  const [overrideReason, setOverrideReason] = useState('Emergency surge: Primary lead unavailable; administrative sign-off authorized.');
+  const [overrideReason, setOverrideReason] = useState('');
 
   // Incident resolution modal state
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
@@ -96,7 +96,9 @@ export const AdminConsoleView: React.FC = () => {
     setFirebaseUser(null);
   };
 
-  const allShifts = [activeHandover, ...archive];
+  // Blank drafts (no shift started yet) are not listed.
+  const allShifts = [activeHandover, ...archive].filter((shift) => shift.handoverCode);
+  const describeLead = (lead: { name: string; role: string }) => (lead.role ? `${lead.name} (${lead.role})` : lead.name);
 
   const handleExecuteOverride = (e: React.FormEvent) => {
     e.preventDefault();
@@ -529,13 +531,18 @@ export const AdminConsoleView: React.FC = () => {
               Shift Override & Emergency Handover Intervention
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Administrators have executive authority to unblock delayed turnovers, arbitrate disputed handovers, and sign off on behalf of delayed personnel with mandatory rationale logging.
+              An administrator can approve a handover once both staff members have signed it. The reason given here is recorded in the override ledger.
             </p>
           </div>
 
           <div className="space-y-3">
+            {allShifts.length === 0 && (
+              <p className="py-6 text-center text-xs text-slate-400">No shifts have been started yet.</p>
+            )}
             {allShifts.map((shift) => {
-              const isPending = shift.status === 'pending_signoff' || shift.status === 'in_progress';
+              const isSealed = shift.status === 'completed' || shift.status === 'archived';
+              const canApprove = shift.id === activeHandover.id && shift.status === 'pending_signoff' &&
+                shift.signoff.outgoingConfirmed && shift.signoff.incomingConfirmed;
               return (
                 <div
                   key={shift.id}
@@ -554,7 +561,7 @@ export const AdminConsoleView: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                      Outgoing: {shift.leadOutgoing.name} ({shift.leadOutgoing.role}) → Incoming: {shift.leadIncoming.name} ({shift.leadIncoming.role})
+                      Outgoing: {describeLead(shift.leadOutgoing)} → Incoming: {describeLead(shift.leadIncoming)}
                     </div>
                     {shift.isOverridden && (
                       <div className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
@@ -564,7 +571,7 @@ export const AdminConsoleView: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    {isPending ? (
+                    {canApprove ? (
                       <button
                         onClick={() => setSelectedShiftToOverride(shift.id)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg cursor-pointer transition-colors shadow-xs"
@@ -572,10 +579,12 @@ export const AdminConsoleView: React.FC = () => {
                         <ShieldAlert className="w-3.5 h-3.5" />
                         <span>Executive Override</span>
                       </button>
-                    ) : (
+                    ) : isSealed ? (
                       <span className="inline-flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400 font-mono font-medium">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Sealed
                       </span>
+                    ) : (
+                      <span className="text-xs text-slate-500 dark:text-slate-400">Awaiting staff signatures</span>
                     )}
                   </div>
                 </div>
@@ -873,7 +882,7 @@ export const AdminConsoleView: React.FC = () => {
               <span>Executive Shift Sign-off Override</span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400">
-              You are exercising administrative authority to forcibly sign and complete this shift transition. An immutable audit record will be registered in the operations audit ledger.
+              This approves and completes a handover that both staff members have signed, and opens the next shift. Your reason is recorded in the override ledger.
             </p>
 
             <form onSubmit={handleExecuteOverride} className="space-y-3 text-xs">

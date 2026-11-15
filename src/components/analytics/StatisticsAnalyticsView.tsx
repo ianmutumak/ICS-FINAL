@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useHandover } from '../../context/HandoverContext';
 import {
   Clock,
@@ -18,6 +18,8 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { SbarProtocolIcon, DualSignoffStampIcon } from '../common/CustomSvgIcons';
+import { AdminStatisticsAssistant } from './AdminStatisticsAssistant';
+import { createStatisticsSnapshot } from '../../lib/statisticsSnapshot';
 
 const SUS_QUESTIONS = [
   { id: 1, text: 'I think that I would like to use this shift handover system frequently.', isPositive: true },
@@ -47,7 +49,8 @@ export const StatisticsAnalyticsView: React.FC = () => {
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<'overview' | 'attendance' | 'compliance' | 'sus-debrief'>('overview');
 
   // Debrief & SUS Form State
-  const [susScores, setSusScores] = useState<number[]>([5, 1, 5, 2, 5, 1, 4, 1, 5, 1]);
+  // 0 means the statement has not been answered yet.
+  const [susScores, setSusScores] = useState<number[]>(() => Array(10).fill(0));
   const [supervisorName, setSupervisorName] = useState(currentUser.name || 'Mary Wanjiku');
   const [supervisorRole, setSupervisorRole] = useState(currentUser.role || 'Shift Operations Supervisor');
   const [debriefNotes, setDebriefNotes] = useState('');
@@ -58,12 +61,14 @@ export const StatisticsAnalyticsView: React.FC = () => {
   // Compute metrics
   const allHandovers = [activeHandover, ...archive];
   const completedHandovers = allHandovers.filter((h) => h.status === 'completed');
+  // Only handovers with a measured signature-to-signature time count toward the average.
+  const measuredHandovers = completedHandovers.filter((h) => h.transitionDurationMinutes > 0);
 
   const avgDuration =
-    completedHandovers.length > 0
+    measuredHandovers.length > 0
       ? Math.round(
-          completedHandovers.reduce((acc, h) => acc + (h.transitionDurationMinutes || 0), 0) /
-            completedHandovers.length
+          measuredHandovers.reduce((acc, h) => acc + h.transitionDurationMinutes, 0) /
+            measuredHandovers.length
         )
       : 0;
 
@@ -83,21 +88,10 @@ export const StatisticsAnalyticsView: React.FC = () => {
         )
       : 0;
 
-  // SUS Algorithm (Brooke, 1996)
-  const calculateCurrentSus = () => {
-    let oddSum = 0;
-    let evenSum = 0;
-    susScores.forEach((score, idx) => {
-      if (idx % 2 === 0) {
-        oddSum += (score - 1);
-      } else {
-        evenSum += (5 - score);
-      }
-    });
-    const totalScore = (oddSum + evenSum) * 2.5;
+  const gradeSus = (totalScore: number) => {
     let grade: 'A' | 'B' | 'C' | 'D' | 'F' = 'F';
     let adjectiveRating: 'Best Imaginable' | 'Excellent' | 'Good' | 'OK' | 'Poor' = 'Poor';
-    let percentileBenchmark = 25;
+    let percentileBenchmark = 20;
 
     if (totalScore >= 80.3) {
       grade = 'A';
@@ -111,16 +105,29 @@ export const StatisticsAnalyticsView: React.FC = () => {
       grade = 'C';
       adjectiveRating = 'OK';
       percentileBenchmark = 50;
-    } else {
-      grade = 'F';
-      adjectiveRating = 'Poor';
-      percentileBenchmark = 20;
     }
 
-    return { totalScore, grade, adjectiveRating, percentileBenchmark, oddSum, evenSum };
+    return { grade, adjectiveRating, percentileBenchmark };
   };
 
-  const currentSus = calculateCurrentSus();
+  // SUS Algorithm (Brooke, 1996)
+  const calculateCurrentSus = () => {
+    let oddSum = 0;
+    let evenSum = 0;
+    susScores.forEach((score, idx) => {
+      if (idx % 2 === 0) {
+        oddSum += (score - 1);
+      } else {
+        evenSum += (5 - score);
+      }
+    });
+    const totalScore = (oddSum + evenSum) * 2.5;
+    return { totalScore, ...gradeSus(totalScore), oddSum, evenSum };
+  };
+
+  // A score only exists once all ten statements have been answered.
+  const answeredCount = susScores.filter((score) => score >= 1).length;
+  const currentSus = answeredCount === susScores.length ? calculateCurrentSus() : null;
 
   const handleScoreChange = (questionIdx: number, val: number) => {
     const updated = [...susScores];
@@ -130,6 +137,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
 
   const handleSusSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentSus) return;
     addSusEvaluation({
       shiftId: activeHandover.id,
       shiftCode: activeHandover.handoverCode,
@@ -146,6 +154,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
       signoffVerificationFeedback: signoffFeedback.trim() || undefined,
     });
     setHasSubmitted(true);
+    setSusScores(Array(10).fill(0));
     setDebriefNotes('');
     setBottlenecks('');
     setSignoffFeedback('');
@@ -153,13 +162,11 @@ export const StatisticsAnalyticsView: React.FC = () => {
   };
 
   // Aggregate Institutional SUS average
-  const institutionalAvgSus =
+  const institutionalSusMean =
     susEvaluations.length > 0
-      ? (
-          susEvaluations.reduce((acc, s) => acc + s.totalScore, 0) /
-          susEvaluations.length
-        ).toFixed(1)
-      : '0.0';
+      ? susEvaluations.reduce((acc, s) => acc + s.totalScore, 0) / susEvaluations.length
+      : null;
+  const institutionalAvgSus = institutionalSusMean !== null ? institutionalSusMean.toFixed(1) : '—';
 
   // Shift duration trends from actual completed handovers
   const shiftTrendData = completedHandovers.map((h) => ({
@@ -168,6 +175,14 @@ export const StatisticsAnalyticsView: React.FC = () => {
     target: 20,
     shift: h.shiftType.charAt(0).toUpperCase() + h.shiftType.slice(1),
   }));
+
+  const statisticsSnapshot = useMemo(() => createStatisticsSnapshot({
+    activeHandover,
+    archive,
+    tasks,
+    attendanceLogs,
+    complianceRecords,
+  }), [activeHandover, archive, tasks, attendanceLogs, complianceRecords]);
 
   return (
     <div className="space-y-6">
@@ -250,13 +265,13 @@ export const StatisticsAnalyticsView: React.FC = () => {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white tabular-nums">
-                {avgDuration}m
+                {measuredHandovers.length > 0 ? `${avgDuration}m` : '—'}
               </span>
               <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center">
-                <TrendingDown className="w-3 h-3 mr-0.5" /> -14% vs verbal
+                {completedHandovers.length} handovers
               </span>
             </div>
-            <span className="text-[10px] text-slate-400 block">Target benchmark: &lt; 20 mins</span>
+            <span className="text-[10px] text-slate-400 block">Based on completed handovers</span>
           </div>
 
           {/* KPI 2: Task Carry-Over Rate */}
@@ -269,13 +284,13 @@ export const StatisticsAnalyticsView: React.FC = () => {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white tabular-nums">
-                {carryOverRate}%
+                {totalTasks > 0 ? `${carryOverRate}%` : '—'}
               </span>
               <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 ({carriedOverTasks} rolled over)
               </span>
             </div>
-            <span className="text-[10px] text-slate-400 block">0% dropped orders guaranteed</span>
+            <span className="text-[10px] text-slate-400 block">Based on recorded tasks</span>
           </div>
 
           {/* KPI 3: Sign-Off Compliance */}
@@ -288,13 +303,13 @@ export const StatisticsAnalyticsView: React.FC = () => {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold font-mono text-teal-700 dark:text-teal-400 tabular-nums">
-                {avgCompliance}%
+                {complianceRecords.length > 0 ? `${avgCompliance}%` : '—'}
               </span>
               <span className="text-[11px] font-semibold text-emerald-600">
-                100% Cryptographic
+                {complianceRecords.length} handovers
               </span>
             </div>
-            <span className="text-[10px] text-slate-400 block">Non-repudiation enforced</span>
+            <span className="text-[10px] text-slate-400 block">Based on recorded sign-offs</span>
           </div>
 
           {/* KPI 4: Staff Huddle Attendance */}
@@ -307,7 +322,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white tabular-nums">
-                {attendanceRate}%
+                {attendanceLogs.length > 0 ? `${attendanceRate}%` : '—'}
               </span>
               <span className="text-[11px] font-medium text-slate-500">
                 {punctualCount}/{attendanceLogs.length} on time
@@ -317,6 +332,8 @@ export const StatisticsAnalyticsView: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <AdminStatisticsAssistant statistics={statisticsSnapshot} />
 
       {/* Tab Content 1: Turnover Metrics & Duration Trends */}
       {activeAnalyticsTab === 'overview' && (
@@ -329,7 +346,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
                   Handover Transition Duration vs 20-Minute Target
                 </h3>
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Elapsed minutes from briefing start to incoming lead attestation
+                  Minutes between the outgoing and incoming signatures
                 </span>
               </div>
               <span className="text-xs font-mono text-teal-700 dark:text-teal-400">
@@ -385,7 +402,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 mt-4">
-              <strong>Operational Benchmark:</strong> Average transition cycle duration reduced to 16.8 minutes per turnover with 100% cryptographic ledger compliance.
+              Metrics are calculated from completed handovers recorded in this system.
             </div>
           </div>
 
@@ -401,7 +418,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
                   Completed Within Shift
                 </span>
                 <span className="text-xl font-bold font-mono text-emerald-900 dark:text-emerald-200">
-                  {100 - parseFloat(carryOverRate)}%
+                  {totalTasks > 0 ? `${(100 - parseFloat(carryOverRate)).toFixed(1)}%` : '—'}
                 </span>
                 <p className="text-[11px] text-slate-600 dark:text-slate-400">
                   Urgent putaways, battery equalizing cycles, and pre-shift MHE clearances resolved before sign-off.
@@ -413,7 +430,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
                   Rolled Forward (Zero-Loss)
                 </span>
                 <span className="text-xl font-bold font-mono text-amber-900 dark:text-amber-200">
-                  {carryOverRate}%
+                  {totalTasks > 0 ? `${carryOverRate}%` : '—'}
                 </span>
                 <p className="text-[11px] text-slate-600 dark:text-slate-400">
                   Unfinished putaways, pending dock receipts, and preventative maintenance observations seamlessly passed to incoming shift priority queue.
@@ -511,7 +528,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
                 Dual Sign-Off Attestation Ledger & Hashes
               </h3>
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                Non-repudiation verification records compliant with operational governance and safety audit standards
+                Review recorded staff signatures and approval status.
               </span>
             </div>
             <span className="text-xs font-mono text-teal-700 dark:text-teal-400">
@@ -591,12 +608,16 @@ export const StatisticsAnalyticsView: React.FC = () => {
                     {institutionalAvgSus}
                   </span>
                   <span className="text-xs font-bold text-slate-400">/ 100</span>
-                  <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                    Grade A
-                  </span>
+                  {institutionalSusMean !== null && (
+                    <span className="px-2 py-0.5 text-xs font-bold rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      Grade {gradeSus(institutionalSusMean).grade}
+                    </span>
+                  )}
                 </div>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 block">
-                  Standard industry average: 68.0 · +{(parseFloat(institutionalAvgSus) - 68.0).toFixed(1)} pts
+                  Standard industry average: 68.0
+                  {institutionalSusMean !== null &&
+                    ` · ${institutionalSusMean >= 68 ? '+' : ''}${(institutionalSusMean - 68).toFixed(1)} pts`}
                 </span>
               </div>
               <Award className="w-8 h-8 text-teal-600 dark:text-teal-400 opacity-80" />
@@ -654,7 +675,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
                   </span>
                 </div>
                 <span className="text-[11px] font-mono font-semibold text-teal-700 dark:text-teal-400">
-                  Live Score: {currentSus.totalScore}
+                  {currentSus ? `Live Score: ${currentSus.totalScore}` : `${answeredCount}/10 answered`}
                 </span>
               </div>
 
@@ -720,6 +741,8 @@ export const StatisticsAnalyticsView: React.FC = () => {
                   <span className="text-[11px] font-mono text-slate-500">Brooke (1996)</span>
                 </div>
 
+                {currentSus ? (
+                <>
                 <div className="p-4 rounded-xl bg-gradient-to-br from-teal-50/80 to-slate-50 dark:from-slate-800/60 dark:to-slate-900/40 border border-teal-200/60 dark:border-slate-700 text-center space-y-2">
                   <span className="text-[11px] font-mono uppercase tracking-wider text-teal-800 dark:text-teal-300 block font-semibold">
                     Composite SUS Usability Score
@@ -767,6 +790,12 @@ export const StatisticsAnalyticsView: React.FC = () => {
                     </span>
                   </div>
                 </div>
+                </>
+                ) : (
+                  <p className="py-8 text-center text-xs text-slate-500 dark:text-slate-400">
+                    Answer all 10 statements to see the score ({answeredCount}/10 answered).
+                  </p>
+                )}
               </div>
 
               {/* Qualitative Debrief Form */}
@@ -780,7 +809,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
                     Supervisor Qualitative Debrief
                   </h3>
                   <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Document operational transition friction, handover speed, and non-repudiation feedback
+                    Record feedback about the handover process and ease of use.
                   </span>
                 </div>
 
@@ -839,7 +868,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                    Dual Signoff & Non-Repudiation Feedback
+                    Dual Signoff & Approval Feedback
                   </label>
                   <input
                     type="text"
@@ -859,7 +888,8 @@ export const StatisticsAnalyticsView: React.FC = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white font-semibold rounded-lg cursor-pointer transition-colors shadow-xs flex items-center justify-center gap-2"
+                  disabled={!currentSus}
+                  className="w-full py-2.5 px-4 bg-teal-700 hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500 text-white font-semibold rounded-lg cursor-pointer transition-colors shadow-xs flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Submit Debrief Evaluation</span>

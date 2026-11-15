@@ -238,7 +238,7 @@ export const ArchiveView: React.FC<ArchiveViewProps> = ({ onStartNewShiftClick }
             <div className="p-4 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/20 text-xs space-y-2">
               <div className="flex items-center gap-2 font-semibold text-emerald-900 dark:text-emerald-300">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span>Non-Repudiation Audit Seal</span>
+                <span>Handover approval record</span>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-1">
                 <div>
