@@ -1,19 +1,89 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * ZAMU-CHECK theme.
+ * "Zamu" is a shift, a turn of duty. The interface is read by tired people at the end of one,
+ * so the type is chosen for legibility first and the colours for a calm, paper-logbook feel:
+ *   - Atkinson Hyperlegible Next: body text, designed so similar letters and digits stay distinct.
+ *   - Bricolage Grotesque: headings, warm and confident without being decorative.
+ *   - Atkinson Hyperlegible Mono: handover codes and times, where characters must not be misread.
+ * The neutral and accent scales below replace Tailwind's cool slate and teal across every screen.
+ */
+@theme {
+  --font-sans: 'Atkinson Hyperlegible Next', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, 'Cascadia Mono', monospace;
+
+  /* Small text is the most common size in the app; 13px reads more easily than 12px. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.5;
+
+  /* Warm paper neutrals (logbook page by day, apron at night). */
+  --color-slate-50: #f8f6f1;
+  --color-slate-100: #f0ede5;
+  --color-slate-200: #e2ddd1;
+  --color-slate-300: #cdc6b7;
+  --color-slate-400: #a09887;
+  --color-slate-500: #777062;
+  --color-slate-600: #5a5549;
+  --color-slate-700: #433f37;
+  --color-slate-800: #2c2a25;
+  --color-slate-900: #1c1b18;
+  --color-slate-950: #11100e;
+
+  /* Pine green: the "all clear, handed over" colour. */
+  --color-teal-50: #eef7f3;
+  --color-teal-100: #d6ece2;
+  --color-teal-200: #afd9c7;
+  --color-teal-300: #7fbfa6;
+  --color-teal-400: #4b9f82;
+  --color-teal-500: #2c8468;
+  --color-teal-600: #1f6b54;
+  --color-teal-700: #195645;
+  --color-teal-800: #164538;
+  --color-teal-900: #12392f;
+  --color-teal-950: #08211b;
+}
+
 @layer base {
   :root {
-    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --font-heading: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-heading: var(--font-display);
   }
 
   body {
     font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.55;
+    text-rendering: optimizeLegibility;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-heading);
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* One visible, consistent keyboard focus style everywhere. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-teal-600);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -26,11 +96,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(119, 112, 98, 0.4);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
+  background: rgba(119, 112, 98, 0.7);
 }
 
 /* Print styles for shift handover summary sheet */

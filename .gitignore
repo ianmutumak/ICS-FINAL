@@ -6,7 +6,3 @@ coverage/
 *.log
 .env*
 !.env.example
-
-docs/*
-!docs/
-!docs/system-design.md

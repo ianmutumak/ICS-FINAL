@@ -1,6 +1,0 @@
-{
-  "summary": "Implementation plan for ZAMU-CHECK: A Standardized Web-Based Architecture for Shift Handover Management. Implements the 4 core capstone modules from Ian Mutuma Kiome's Strathmore University proposal: Unified SBAR & HEI active turnover suite, Embedded 10-item System Usability Scale (SUS) debrief tab, Dynamic user-defined equipment and category engine, and Dual Cryptographic Verification Ledger.",
-  "updatedAt": "2026-11-03T16:51:39.714644438Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

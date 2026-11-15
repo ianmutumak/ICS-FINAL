@@ -1,43 +1,48 @@
 import React, { useState } from 'react';
 import { useHandover } from '../../context/HandoverContext';
 import { ZamuLogoIcon } from '../common/CustomSvgIcons';
-import {
-  Lock,
-  LogIn,
-  AlertCircle,
-  User,
-  Hash,
-} from 'lucide-react';
+import { AlertCircle, ClipboardList, LogIn, PenLine, ShieldCheck, UserPlus } from 'lucide-react';
+
+const HANDOVER_STEPS = [
+  { icon: ClipboardList, title: 'Record', text: 'Log what the next team needs to know as it happens, not from memory at the end.' },
+  { icon: PenLine, title: 'Sign', text: 'The outgoing and incoming staff each sign with their own account.' },
+  { icon: ShieldCheck, title: 'Approve', text: 'An administrator reviews the signed handover and closes the shift.' },
+];
 
 export const AuthGatewayView: React.FC = () => {
   const { signInUser, signUpUser } = useHandover();
 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [errorMessage, setErrorMessage] = useState('');
 
   // Sign In State
   const [staffNumberInput, setStaffNumberInput] = useState('');
   const [pinInput, setPinInput] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
 
   // Sign Up State
   const [fullName, setFullName] = useState('');
   const [newStaffNumber, setNewStaffNumber] = useState('');
   const [newPin, setNewPin] = useState('');
 
+  const switchMode = (mode: 'signin' | 'signup') => {
+    setAuthMode(mode);
+    setErrorMessage('');
+  };
+
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     if (staffNumberInput.trim().length === 0) {
-      setErrorMessage('Please enter your Badge ID.');
+      setErrorMessage('Enter your badge ID.');
       return;
     }
     if (pinInput.trim().length < 4) {
-      setErrorMessage('PIN must be at least 4 digits.');
+      setErrorMessage('Your PIN has at least 4 digits.');
       return;
     }
     const res = signInUser(staffNumberInput.trim(), pinInput.trim());
     if (!res.success) {
-      setErrorMessage(res.error || 'Authentication failed. Please verify credentials.');
+      setErrorMessage(res.error || 'We could not sign you in. Check your badge ID and PIN.');
     }
   };
 
@@ -45,196 +50,184 @@ export const AuthGatewayView: React.FC = () => {
     e.preventDefault();
     setErrorMessage('');
     if (!fullName.trim() || !newStaffNumber.trim()) {
-      setErrorMessage('Please fill in required fields.');
+      setErrorMessage('Enter your name and badge ID.');
       return;
     }
     if (newStaffNumber.trim().length < 4) {
-      setErrorMessage('Badge ID must be at least 4 characters.');
+      setErrorMessage('A badge ID has at least 4 characters.');
       return;
     }
     if (newPin.trim().length < 4) {
-      setErrorMessage('PIN must be at least 4 digits.');
+      setErrorMessage('Choose a PIN with at least 4 digits.');
       return;
     }
 
-    const res = signUpUser(
-      {
-        name: fullName.trim(),
-        staffNumber: newStaffNumber.trim().toUpperCase(),
-        department: '',
-        role: 'Staff member',
-        qualification: '',
-        pin: newPin.trim(),
-      }
-    );
+    const res = signUpUser({
+      name: fullName.trim(),
+      staffNumber: newStaffNumber.trim().toUpperCase(),
+      department: '',
+      role: 'Staff member',
+      qualification: '',
+      pin: newPin.trim(),
+    });
     if (!res.success) {
-      setErrorMessage(res.error || 'Registration failed. Please try again.');
+      setErrorMessage(res.error || 'We could not create the account. Try again.');
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col justify-center items-center px-4 py-10 relative overflow-hidden select-none">
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+  const labelClass = 'block text-sm font-semibold text-slate-800';
+  const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-3 text-base text-slate-900 placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20';
+  const submitClass = 'flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-base font-semibold text-white transition-colors hover:bg-teal-800';
 
-      <div className="max-w-md w-full relative z-10 space-y-5">
-        {/* Brand */}
-        <div className="text-center space-y-1.5">
-          <div className="inline-flex p-2.5 rounded-2xl bg-teal-950/80 border border-teal-800/80 text-teal-400 shadow-xl mb-1">
-            <ZamuLogoIcon className="w-9 h-9" />
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white font-sans">
-            ZAMU-CHECK
-          </h1>
-          <p className="text-xs text-slate-400">
-            Shift handover management
-          </p>
+  return (
+    <div className="grid min-h-screen bg-slate-50 text-slate-900 lg:grid-cols-[1.05fr_1fr]">
+      {/* Brand panel: what the system is for, in the order a shift goes through it */}
+      <aside className="relative flex flex-col justify-between gap-6 overflow-hidden bg-teal-900 px-6 py-7 text-teal-50 sm:px-10 lg:gap-10 lg:px-14 lg:py-12">
+        <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border-[40px] border-teal-800/60" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -left-20 h-96 w-96 rounded-full border-[40px] border-teal-800/40" />
+
+        <div className="relative flex items-center gap-3">
+          <ZamuLogoIcon className="h-10 w-10 text-amber-300" />
+          <span className="font-[family-name:var(--font-display)] text-xl font-bold tracking-tight text-white">Zamu-Check</span>
         </div>
 
-        {/* Portal Card */}
-        <div className="bg-slate-950/90 rounded-2xl border border-slate-800 shadow-2xl p-5 sm:p-6 backdrop-blur-xl space-y-4">
-          {/* Mode Switcher Tabs */}
-          <div className="flex items-center gap-1 p-1 bg-slate-900 rounded-xl text-xs">
-            <button
-              type="button"
-              onClick={() => { setAuthMode('signin'); setErrorMessage(''); }}
-              className={`flex-1 py-1.5 rounded-lg font-medium transition-all text-center cursor-pointer ${
-                authMode === 'signin'
-                  ? 'bg-slate-800 text-white shadow-xs font-semibold'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => { setAuthMode('signup'); setErrorMessage(''); }}
-              className={`flex-1 py-1.5 rounded-lg font-medium transition-all text-center cursor-pointer ${
-                authMode === 'signup'
-                  ? 'bg-slate-800 text-white shadow-xs font-semibold'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Register
-            </button>
+        <div className="relative max-w-lg">
+          <h1 className="text-3xl font-bold leading-tight text-white sm:text-4xl lg:text-5xl">
+            Nothing gets lost between shifts.
+          </h1>
+          <p className="mt-4 text-base leading-relaxed text-teal-100 sm:text-lg">
+            A structured handover for cargo and warehouse teams: clear updates, two signatures, one approved record.
+          </p>
+
+          {/* On phones and tablets the form comes straight after the headline. */}
+          <ol className="mt-8 hidden space-y-5 lg:block">
+            {HANDOVER_STEPS.map(({ icon: Icon, title, text }, index) => (
+              <li key={title} className="flex gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-800 text-amber-300">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-semibold text-white">{index + 1}. {title}</p>
+                  <p className="text-sm leading-relaxed text-teal-100">{text}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+
+        <p className="relative hidden text-sm text-teal-200 lg:block">Shift handover management</p>
+      </aside>
+
+      {/* Sign-in panel */}
+      <main className="flex items-center justify-center px-6 py-10 sm:px-10">
+        <div className="w-full max-w-sm">
+          <h2 className="text-2xl font-bold text-slate-900">
+            {authMode === 'signin' ? 'Sign in to your shift' : 'Create your account'}
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            {authMode === 'signin' ? 'Use the badge ID and PIN you registered with.' : 'You will sign handovers with this account.'}
+          </p>
+
+          <div role="tablist" aria-label="Account" className="mt-6 grid grid-cols-2 gap-1 rounded-xl bg-slate-200/70 p-1 text-sm">
+            {([['signin', 'Sign in'], ['signup', 'Register']] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                role="tab"
+                aria-selected={authMode === mode}
+                onClick={() => switchMode(mode)}
+                className={`rounded-lg py-2 font-semibold transition-colors ${
+                  authMode === mode ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           {errorMessage && (
-            <div className="p-2.5 rounded-lg bg-rose-950/40 border border-rose-900/80 text-xs text-rose-300 flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+            <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm text-rose-800">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>{errorMessage}</span>
             </div>
           )}
 
-          {/* Mode 1: Sign In */}
-          {authMode === 'signin' && (
-            <form onSubmit={handleSignIn} className="space-y-3.5 text-xs">
-              <div>
-                <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                  <Hash className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Badge ID</span>
-                </label>
+          {authMode === 'signin' ? (
+            <form onSubmit={handleSignIn} className="mt-5 space-y-4">
+              <label className={labelClass}>
+                Badge ID
                 <input
                   type="text"
                   required
+                  autoComplete="username"
                   value={staffNumberInput}
                   onChange={(e) => setStaffNumberInput(e.target.value)}
-                  placeholder="Enter your staff ID"
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className={`${inputClass} font-mono`}
                 />
-              </div>
-
-              <div>
-                <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                  <Lock className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Security PIN</span>
-                </label>
+              </label>
+              <label className={labelClass}>
+                PIN
                 <input
                   type="password"
                   required
                   inputMode="numeric"
                   pattern="[0-9]*"
                   maxLength={6}
+                  autoComplete="current-password"
                   value={pinInput}
                   onChange={(e) => setPinInput(e.target.value)}
-                  placeholder="4-digit PIN"
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className={`${inputClass} font-mono tracking-[0.3em]`}
                 />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 px-4 font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors cursor-pointer shadow-lg text-xs mt-1 flex items-center justify-center gap-2"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Sign In</span>
+              </label>
+              <button type="submit" className={submitClass}>
+                <LogIn className="h-5 w-5" /> Sign in
               </button>
             </form>
-          )}
-
-          {/* Mode 2: Sign Up */}
-          {authMode === 'signup' && (
-            <form onSubmit={handleSignUp} className="space-y-3 text-xs">
-              <div>
-                <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Full Name *</span>
-                </label>
+          ) : (
+            <form onSubmit={handleSignUp} className="mt-5 space-y-4">
+              <label className={labelClass}>
+                Full name
                 <input
                   type="text"
                   required
+                  autoComplete="name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. David Kiprop"
-                  className="w-full px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  className={inputClass}
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1">
-                    <Hash className="w-3 h-3 text-slate-400" />
-                    <span>Badge ID *</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={newStaffNumber}
-                    onChange={(e) => setNewStaffNumber(e.target.value)}
-                    placeholder="Enter your staff ID"
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
-                  />
-                </div>
-                <div>
-                  <label className="text-slate-300 font-semibold mb-1 flex items-center gap-1">
-                    <Lock className="w-3 h-3 text-slate-400" />
-                    <span>PIN (4 Digits) *</span>
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={6}
-                    value={newPin}
-                    onChange={(e) => setNewPin(e.target.value)}
-                    placeholder="4-digit PIN"
-                    className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-800 rounded-xl text-white font-mono text-[11px]"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-2.5 px-4 font-semibold text-white bg-teal-600 hover:bg-teal-500 rounded-xl transition-colors cursor-pointer shadow-lg text-xs mt-1"
-              >
-                Register Account
+              </label>
+              <label className={labelClass}>
+                Badge ID
+                <input
+                  type="text"
+                  required
+                  autoComplete="username"
+                  value={newStaffNumber}
+                  onChange={(e) => setNewStaffNumber(e.target.value)}
+                  className={`${inputClass} font-mono`}
+                />
+              </label>
+              <label className={labelClass}>
+                Choose a PIN <span className="font-normal text-slate-500">(4 to 6 digits)</span>
+                <input
+                  type="password"
+                  required
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  autoComplete="new-password"
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value)}
+                  className={`${inputClass} font-mono tracking-[0.3em]`}
+                />
+              </label>
+              <button type="submit" className={submitClass}>
+                <UserPlus className="h-5 w-5" /> Create account
               </button>
             </form>
           )}
-
         </div>
-      </div>
+      </main>
     </div>
   );
 };
