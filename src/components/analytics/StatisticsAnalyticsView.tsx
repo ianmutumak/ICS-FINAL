@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { FlaskConical } from 'lucide-react';
 import { useHandover } from '../../context/HandoverContext';
-import { createStatisticsSnapshot, createSyntheticStatisticsSnapshot } from '../../lib/statisticsSnapshot';
-import { AdminStatisticsAssistant } from './AdminStatisticsAssistant';
+import { createStatisticsSnapshot, demoStatistics } from '../../lib/statisticsSnapshot';
+import { ForecastPanel } from './ForecastPanel';
 import { BarList, ChartCard, ChartDatum, ColumnChart, StatTile } from './Charts';
 
 const DEMO_DATA_KEY = 'zamu_statistics_demo_data_v7';
@@ -31,13 +31,13 @@ function toRows(counts: Record<string, number>, labels: Record<string, string>):
 
 const percent = (part: number, total: number) => (total > 0 ? `${Math.round((part / total) * 100)}%` : '—');
 
-type SectionId = 'trend' | 'shifts' | 'status' | 'tasks' | 'assistant';
+type SectionId = 'forecast' | 'trend' | 'shifts' | 'status' | 'tasks';
 const SECTIONS: { id: SectionId; label: string }[] = [
+  { id: 'forecast', label: 'Forecast' },
   { id: 'trend', label: 'Monthly trend' },
   { id: 'shifts', label: 'Shifts' },
   { id: 'status', label: 'Status' },
   { id: 'tasks', label: 'Tasks' },
-  { id: 'assistant', label: 'Assistant' },
 ];
 
 export const StatisticsAnalyticsView: React.FC = () => {
@@ -76,7 +76,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
     [activeHandover, archive, tasks, attendanceLogs, complianceRecords]
   );
   // Every number, chart and assistant answer on this page comes from this one object.
-  const stats = useDemoData ? createSyntheticStatisticsSnapshot() : appStatistics;
+  const stats = useDemoData ? demoStatistics : appStatistics;
 
   const monthly: ChartDatum[] = Object.keys(stats.handoversByMonth).sort().map((month) => {
     const date = new Date(`${month}-01T00:00:00`);
@@ -188,6 +188,11 @@ export const StatisticsAnalyticsView: React.FC = () => {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
+            {show('forecast') && (
+              <div className="lg:col-span-2">
+                <ForecastPanel showingDemoData={useDemoData} />
+              </div>
+            )}
             {show('trend') && (
               <div className="lg:col-span-2">
                 <ChartCard title="Handovers per month" subtitle="Hover or tab to a bar for the exact count">
@@ -220,11 +225,6 @@ export const StatisticsAnalyticsView: React.FC = () => {
               >
                 <BarList data={toRows(stats.tasksByStatus, TASK_LABELS)} emptyMessage="No tasks have been recorded yet." />
               </ChartCard>
-            )}
-            {show('assistant') && (
-              <div className={show('tasks') ? '' : 'lg:col-span-2'}>
-                <AdminStatisticsAssistant statistics={stats} />
-              </div>
             )}
           </div>
         </>
