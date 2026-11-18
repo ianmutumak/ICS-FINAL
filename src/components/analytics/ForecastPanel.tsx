@@ -35,8 +35,7 @@ export const ForecastPanel: React.FC<ForecastPanelProps> = ({ showingDemoData })
           <TrendingUp className="h-5 w-5 text-teal-700 dark:text-teal-400" /> Workload forecast
         </h3>
         <p className="mt-2 max-w-2xl text-base text-slate-600 dark:text-slate-300">
-          A forecast needs a history to learn from: at least a year of daily handover records. The live data does not have that yet.
-          Switch to demo data to see the forecast working on a generated history.
+          There is not enough handover history yet to forecast the coming days.
         </p>
       </section>
     );
@@ -67,7 +66,6 @@ export const ForecastPanel: React.FC<ForecastPanelProps> = ({ showingDemoData })
     .sort((a, b) => b.value - a.value)
     .slice(0, 3);
 
-  const { evaluation } = series;
   const segment = (isActive: boolean) =>
     `whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
       isActive ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300'
@@ -142,10 +140,10 @@ export const ForecastPanel: React.FC<ForecastPanelProps> = ({ showingDemoData })
       <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
         <li className="flex items-center gap-2"><span className="h-0.5 w-6 bg-teal-700 dark:bg-teal-400" /> Recorded</li>
         <li className="flex items-center gap-2"><span className="w-6 border-t-2 border-dashed border-teal-700 dark:border-teal-400" /> Forecast</li>
-        <li className="flex items-center gap-2"><span className="h-3 w-6 rounded-sm bg-teal-600/15 dark:bg-teal-400/20" /> Range it should fall in 8 times out of 10</li>
+        <li className="flex items-center gap-2"><span className="h-3 w-6 rounded-sm bg-teal-600/15 dark:bg-teal-400/20" /> Likely range</li>
       </ul>
 
-      <div className="mt-5 grid gap-5 border-t border-slate-100 pt-5 dark:border-slate-800 lg:grid-cols-2">
+      <div className="mt-5 border-t border-slate-100 pt-5 dark:border-slate-800">
         <div>
           <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Busiest shifts ahead</h4>
           <ol className="mt-2 space-y-1.5">
@@ -156,14 +154,6 @@ export const ForecastPanel: React.FC<ForecastPanelProps> = ({ showingDemoData })
               </li>
             ))}
           </ol>
-        </div>
-        <div>
-          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">How good is it?</h4>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-            Tested on {evaluation.testDays} days it had never seen, the model ({series.model.toLowerCase()}) was off by{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">{evaluation.maeModel.toFixed(1)} per shift</span> on average.
-            Guessing "the same as two weeks ago" was off by {evaluation.maeBaseline.toFixed(1)}, so the model is {Math.round(evaluation.improvementPercent)}% better.
-          </p>
         </div>
       </div>
 
@@ -196,11 +186,6 @@ export const ForecastPanel: React.FC<ForecastPanelProps> = ({ showingDemoData })
           </table>
         </div>
       </details>
-
-      <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-        Trained on {forecastMeta.historyRows.toLocaleString()} generated shift records ({forecastMeta.historyFrom} to {forecastMeta.historyTo}).
-        It shows how the forecast works; it is not a prediction for a real operation.
-      </p>
     </section>
   );
 };

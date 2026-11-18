@@ -111,7 +111,7 @@ def generate(end_date: date, years: int = DEFAULT_YEARS, seed: int = DEFAULT_SEE
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--end-date", default=date.today().isoformat(), help="last day of history (YYYY-MM-DD)")
+    parser.add_argument("--end-date", default=(date.today() - timedelta(days=1)).isoformat(), help="last full day of history (YYYY-MM-DD); default yesterday")
     parser.add_argument("--years", type=int, default=DEFAULT_YEARS)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--out", default=str(Path(__file__).parent / "data" / "shift_history.csv"))
