@@ -24,7 +24,6 @@ import {
   Tag,
   ClipboardList,
 } from 'lucide-react';
-import { loginWithGoogle, logoutFirebase, auth } from '../../lib/firebase';
 
 export const AdminConsoleView: React.FC = () => {
   const {
@@ -78,23 +77,6 @@ export const AdminConsoleView: React.FC = () => {
 
   // Category state
   const [newCategoryInput, setNewCategoryInput] = useState('');
-
-  // Firebase auth state indicator
-  const [firebaseUser, setFirebaseUser] = useState(auth.currentUser);
-
-  const handleGoogleAuth = async () => {
-    try {
-      const user = await loginWithGoogle();
-      setFirebaseUser(user);
-    } catch (err) {
-      console.warn('Google Sign-in prompt:', err);
-    }
-  };
-
-  const handleGoogleSignout = async () => {
-    await logoutFirebase();
-    setFirebaseUser(null);
-  };
 
   // Blank drafts (no shift started yet) are not listed.
   const allShifts = [activeHandover, ...archive].filter((shift) => shift.handoverCode);
@@ -174,7 +156,7 @@ export const AdminConsoleView: React.FC = () => {
             </h1>
           </div>
 
-          {/* Right Header Actions: Exit Console + Firebase Cloud Connection */}
+          {/* Right Header Actions */}
           <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
             <button
               onClick={() => setActiveTab('active-handover')}
@@ -184,26 +166,6 @@ export const AdminConsoleView: React.FC = () => {
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
 
-            {firebaseUser ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-800 dark:text-emerald-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                <span className="font-mono text-[11px] truncate max-w-[140px]">{firebaseUser.email}</span>
-                <button
-                  onClick={handleGoogleSignout}
-                  className="text-[10px] underline ml-1 text-slate-500 cursor-pointer"
-                >
-                  Disconnect
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleGoogleAuth}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                <span>Link Firebase Admin</span>
-              </button>
-            )}
           </div>
         </div>
 
