@@ -17,8 +17,8 @@ export const Header: React.FC = () => {
   ];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-slate-50/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="no-print sticky top-0 z-30 border-b border-slate-200 bg-slate-50/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6 lg:px-8">
         <button onClick={() => setActiveTab('active-handover')} className="flex items-center gap-2.5 rounded-lg text-left">
           <ZamuLogoIcon className="h-8 w-8 text-teal-700 dark:text-teal-400" />
           <span className={`whitespace-nowrap font-[family-name:var(--font-display)] text-lg font-bold tracking-tight text-slate-900 dark:text-white ${isAdmin ? 'hidden sm:inline' : ''}`}>
@@ -27,13 +27,13 @@ export const Header: React.FC = () => {
         </button>
 
         {isAdmin && (
-          <nav aria-label="Main" className="flex items-center gap-1 rounded-full bg-slate-200/70 p-1 dark:bg-slate-800">
+          <nav aria-label="Main" className="flex min-w-0 items-center gap-0.5 rounded-full bg-slate-200/70 p-1 dark:bg-slate-800 sm:gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 aria-current={activeTab === tab.id ? 'page' : undefined}
-                className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                className={`whitespace-nowrap rounded-full px-2.5 py-1.5 text-[13px] font-medium transition-colors sm:px-3.5 sm:text-sm ${
                   activeTab === tab.id
                     ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white'
                     : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
@@ -45,7 +45,7 @@ export const Header: React.FC = () => {
           </nav>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-3">
           {/* With the admin navigation in the bar there is less room, so the name appears later. */}
           <div className={`hidden whitespace-nowrap text-right leading-tight ${isAdmin ? 'lg:block' : 'sm:block'}`}>
             <p className="text-sm font-semibold text-slate-900 dark:text-white">{currentUser.name}</p>

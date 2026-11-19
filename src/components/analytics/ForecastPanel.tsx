@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { TrendingUp } from 'lucide-react';
+import { Check, TrendingUp, X } from 'lucide-react';
+import { useHandover } from '../../context/HandoverContext';
 import { ForecastMetric, demoForecast, forecastMeta } from '../../lib/forecast';
 
 const SHIFTS = ['morning', 'evening', 'night'] as const;
@@ -27,6 +28,9 @@ interface ForecastPanelProps {
 export const ForecastPanel: React.FC<ForecastPanelProps> = ({ showingDemoData }) => {
   const [metric, setMetric] = useState<ForecastMetric>('handovers');
   const [active, setActive] = useState<number | null>(null);
+  const { forecastDecisions, recordForecastDecision } = useHandover();
+  const [noting, setNoting] = useState<{ key: string; decision: 'plan' | 'dismiss' } | null>(null);
+  const [note, setNote] = useState('');
 
   if (!showingDemoData) {
     return (
@@ -147,12 +151,40 @@ export const ForecastPanel: React.FC<ForecastPanelProps> = ({ showingDemoData })
         <div>
           <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Busiest shifts ahead</h4>
           <ol className="mt-2 space-y-1.5">
-            {busiest.map((item) => (
-              <li key={`${item.date}-${item.shift}`} className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="text-slate-800 dark:text-slate-200">{fullDate(item.date)}, <span className="capitalize">{item.shift}</span></span>
-                <span className="tabular-nums font-semibold text-slate-900 dark:text-white">about {oneDecimal(item.value)}</span>
-              </li>
-            ))}
+            {busiest.map((item) => {
+              const key = `${metric}|${item.date}|${item.shift}`;
+              const latest = forecastDecisions.find((d) => d.metric === metric && d.date === item.date && d.shift === item.shift);
+              const choose = (decision: 'plan' | 'dismiss') => { setNoting({ key, decision }); setNote(''); };
+              const save = () => {
+                if (!noting) return;
+                recordForecastDecision({ metric, date: item.date, shift: item.shift, expected: Math.round(item.value * 10) / 10, decision: noting.decision, note });
+                setNoting(null);
+                setNote('');
+              };
+              return (
+                <li key={key} className="text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+                    <span className="text-slate-800 dark:text-slate-200">{fullDate(item.date)}, <span className="capitalize">{item.shift}</span> <span className="tabular-nums font-semibold text-slate-900 dark:text-white">about {oneDecimal(item.value)}</span></span>
+                    <span className="flex items-center gap-1.5">
+                      {latest && (
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${latest.decision === 'plan' ? 'bg-teal-100 text-teal-900' : 'bg-slate-200 text-slate-700'}`}>
+                          {latest.decision === 'plan' ? 'Planned for' : 'Dismissed'} by {latest.by}
+                        </span>
+                      )}
+                      <button type="button" onClick={() => choose('plan')} aria-label={`Plan for ${fullDate(item.date)} ${item.shift}`} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"><Check className="h-3.5 w-3.5" /> Plan</button>
+                      <button type="button" onClick={() => choose('dismiss')} aria-label={`Dismiss ${fullDate(item.date)} ${item.shift}`} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"><X className="h-3.5 w-3.5" /> Dismiss</button>
+                    </span>
+                  </div>
+                  {noting?.key === key && (
+                    <form onSubmit={(event) => { event.preventDefault(); save(); }} className="mt-2 flex gap-2">
+                      <input autoFocus aria-label="Note (optional)" value={note} onChange={(event) => setNote(event.target.value)} maxLength={140} placeholder={noting.decision === 'plan' ? 'What will you do? (optional)' : 'Why dismiss? (optional)'} className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+                      <button type="submit" className="rounded-lg bg-teal-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-800">Save</button>
+                      <button type="button" onClick={() => setNoting(null)} className="rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</button>
+                    </form>
+                  )}
+                </li>
+              );
+            })}
           </ol>
         </div>
       </div>

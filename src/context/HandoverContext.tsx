@@ -7,6 +7,7 @@ import { STORAGE_KEYS, readStored, usePersistedState } from './storage';
 import { useAuth } from './useAuth';
 import { useFacility } from './useFacility';
 import { useShift } from './useShift';
+import { useForecastReview } from './useForecastReview';
 
 export { MASTER_ADMIN_PASSKEY } from './useAuth';
 export { calculateHEI } from '../lib/shiftRules';
@@ -23,6 +24,7 @@ type HandoverContextType =
   & Omit<ReturnType<typeof useAuth>, never>
   & Omit<ReturnType<typeof useFacility>, 'setDepartments' | 'setIncidents'>
   & Omit<ReturnType<typeof useShift>, 'setActiveHandover' | 'setArchive' | 'setTasks'>
+  & ReturnType<typeof useForecastReview>
   & {
     activeTab: NavigationTab;
     setActiveTab: (tab: NavigationTab) => void;
@@ -67,6 +69,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     (isAdmin) => setActiveTab(isAdmin ? 'admin' : 'active-handover'),
     () => setActiveTab('active-handover')
   );
+  const forecastReview = useForecastReview(auth.currentUser);
   const { setDepartments, setIncidents, ...facility } = useFacility(auth.currentUser);
   const { setActiveHandover, setArchive, setTasks, ...shift } = useShift({
     isAuthenticated: auth.isAuthenticated,
@@ -158,6 +161,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         ...auth,
         ...facility,
         ...shift,
+        ...forecastReview,
         activeTab,
         setActiveTab,
         dbSyncStatus,

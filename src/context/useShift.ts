@@ -32,9 +32,11 @@ import {
   calculateHEI,
   formatTime,
   isClosedShift,
+  unacknowledgedWarnings,
   localDateString,
   makeHandoverCode,
   minutesBetween,
+  sealHandover,
   toPublicStaff,
 } from '../lib/shiftRules';
 import { STORAGE_KEYS, readStored, usePersistedState } from './storage';
@@ -162,12 +164,17 @@ export function useShift({
 
   const updateSummaryNotes = (notes: string) => updateActive({ ...activeHandover, summaryNotes: notes });
 
+  // Once the outgoing staff member has signed, the content they signed for cannot change.
+  const isLocked = activeHandover.signoff.outgoingConfirmed;
+
   const addCase = (newCaseData: Omit<SbarCase, 'id' | 'lastUpdated'>) => {
+    if (isLocked || !activeHandover.handoverCode) return;
     const newCase: SbarCase = { ...newCaseData, id: `case-${Date.now().toString(36)}`, lastUpdated: formatTime() };
     updateActive({ ...activeHandover, cases: [newCase, ...activeHandover.cases] });
   };
 
   const updateCase = (caseId: string, updatedFields: Partial<SbarCase>) => {
+    if (isLocked) return;
     updateActive({
       ...activeHandover,
       cases: activeHandover.cases.map((c) => (c.id === caseId ? { ...c, ...updatedFields, lastUpdated: formatTime() } : c)),
@@ -175,10 +182,12 @@ export function useShift({
   };
 
   const deleteCase = (caseId: string) => {
+    if (isLocked) return;
     updateActive({ ...activeHandover, cases: activeHandover.cases.filter((c) => c.id !== caseId) });
   };
 
   const toggleEquipmentCustody = (itemId: string) => {
+    if (isLocked) return;
     updateActive({
       ...activeHandover,
       equipment: activeHandover.equipment.map((eq) => (eq.id === itemId ? { ...eq, custodyChecked: !eq.custodyChecked } : eq)),
@@ -186,7 +195,9 @@ export function useShift({
   };
 
   const addEquipmentItem = (itemData: Omit<EquipmentItem, 'id' | 'custodyChecked'>) => {
-    const newItem: EquipmentItem = { ...itemData, id: `eq-${Date.now().toString(36)}`, custodyChecked: true };
+    if (isLocked || !activeHandover.handoverCode) return;
+    // Custody starts unchecked: it is ticked during the joint walk-through.
+    const newItem: EquipmentItem = { ...itemData, id: `eq-${Date.now().toString(36)}`, custodyChecked: false };
     updateActive({ ...activeHandover, equipment: [...activeHandover.equipment, newItem] });
   };
 
@@ -252,13 +263,30 @@ export function useShift({
     });
   };
 
+  /** The incoming staff member acknowledges one update's safety warning. */
+  const acknowledgeWarning = (caseId: string) => {
+    const { signoff } = activeHandover;
+    if (!isAuthenticated || hasAdminClearance || !signoff.outgoingConfirmed || signoff.incomingConfirmed ||
+      signoff.outgoingStaffId === currentUser.id) return;
+    updateActive({
+      ...activeHandover,
+      cases: activeHandover.cases.map((c) =>
+        c.id === caseId && c.isolationOrHazardAlert && !c.acknowledgedAt
+          ? { ...c, acknowledgedBy: currentUser.name, acknowledgedById: currentUser.id, acknowledgedAt: new Date().toISOString() }
+          : c
+      ),
+    });
+  };
+
   const signIncomingLead = () => {
     const { signoff } = activeHandover;
     if (!isAuthenticated || hasAdminClearance || !signoff.outgoingConfirmed || signoff.incomingConfirmed ||
       signoff.outgoingStaffId === currentUser.id) return;
+    // Every safety warning must have been acknowledged before the handover can be accepted.
+    if (unacknowledgedWarnings(activeHandover).length > 0) return;
     const signer = toPublicStaff(currentUser);
     const nowIso = new Date().toISOString();
-    updateActive({
+    const signed: HandoverRecord = {
       ...activeHandover,
       // Only a handover with both signatures waits for administrator approval.
       status: 'pending_signoff',
@@ -273,6 +301,16 @@ export function useShift({
         incomingSignedAt: nowIso,
         incomingSignatureText: signer.name,
       },
+    };
+    updateActive(signed);
+
+    // Seal the signed record with a SHA-256 fingerprint as soon as it is computed (a few milliseconds).
+    void sealHandover(signed).then((hash) => {
+      if (!hash) return;
+      setActiveHandover((current) =>
+        current.id === signed.id ? { ...current, signoff: { ...current.signoff, verificationHash: hash } } : current
+      );
+      saveShiftToFirestore({ ...signed, signoff: { ...signed.signoff, verificationHash: hash } });
     });
   };
 
@@ -285,6 +323,8 @@ export function useShift({
       ...activeHandover,
       status: 'completed',
       completedAt: nowIso,
+      approvedBy: currentUser.name,
+      approvedById: currentUser.id,
       ...(override ? { isOverridden: true, overrideReason: override.reason } : {}),
     };
     setArchive((prev) => [finalized, ...prev.filter((shift) => shift.id !== finalized.id)]);
@@ -317,7 +357,8 @@ export function useShift({
       attendanceCount: 0,
       transitionDurationMinutes: 0,
       summaryNotes: 'Shift initiated. All unresolved items from prior shift rolled over automatically.',
-      cases: activeHandover.cases,
+      // Updates carry over, but each safety warning must be acknowledged again by the next incoming staff member.
+      cases: activeHandover.cases.map(({ acknowledgedBy: _by, acknowledgedById: _byId, acknowledgedAt: _at, ...rest }) => rest),
       equipment: activeHandover.equipment.map((eq) => ({ ...eq, custodyChecked: false })),
       actions: carriedActions,
       signoff: emptySignoff(nextLead),
@@ -374,6 +415,8 @@ export function useShift({
     toggleTaskStatus,
     deleteTask,
     signOutgoingLead,
+    acknowledgeWarning,
+    isLocked,
     signIncomingLead,
     completeAndArchiveShift,
     overrideShiftSignoff,

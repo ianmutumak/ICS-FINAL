@@ -12,7 +12,7 @@
       "label": "Handovers",
       "model": "Poisson regression",
       "chosen": "linear",
-      "choiceReason": "Trees were not better by more than one standard error (-0.012 vs 0.024), so the simpler model is kept.",
+      "choiceReason": "Trees were not better by more than one standard error (+0.007 vs 0.013), so the simpler model is kept.",
       "trainingRows": 2172,
       "evaluation": {
         "testDays": 56,
@@ -23,37 +23,42 @@
             "mae": 2.53,
             "rmse": 3.142
           },
+          "Holt-Winters exponential smoothing": {
+            "mae": 1.957,
+            "rmse": 2.464
+          },
           "Poisson regression": {
-            "mae": 2.007,
-            "rmse": 2.493
+            "mae": 1.972,
+            "rmse": 2.461
           },
           "Gradient-boosted trees": {
-            "mae": 2.01,
-            "rmse": 2.498
+            "mae": 1.948,
+            "rmse": 2.429
           }
         },
         "perDay": {
           "model": {
-            "mae": 3.772,
-            "rmse": 4.836
+            "mae": 3.643,
+            "rmse": 4.728
           },
           "baseline": {
             "mae": 4.161,
             "rmse": 5.948
           }
         },
-        "maeModel": 2.007,
+        "maeModel": 1.972,
         "maeBaseline": 2.53,
-        "improvementPercent": 20.7,
+        "improvementPercent": 22.1,
         "range80": {
           "perShift": [
-            -2.68,
-            3.27
+            -2.74,
+            3.21
           ],
-          "perDay": [
-            -4.62,
-            6.09
+          "perDayScaled": [
+            -1.238,
+            1.532
           ],
+          "calibrationDays": 364,
           "testCoveragePercent": 71.4
         }
       },
@@ -64,74 +69,86 @@
           {
             "from": "2026-04-08",
             "Same weekday two weeks earlier (baseline)": 2.19,
-            "Poisson regression": 1.838,
-            "Gradient-boosted trees": 1.934
+            "Holt-Winters exponential smoothing": 1.974,
+            "Poisson regression": 1.802,
+            "Gradient-boosted trees": 1.877
           },
           {
             "from": "2026-04-22",
             "Same weekday two weeks earlier (baseline)": 2.69,
-            "Poisson regression": 2.279,
-            "Gradient-boosted trees": 2.073
+            "Holt-Winters exponential smoothing": 2.204,
+            "Poisson regression": 2.259,
+            "Gradient-boosted trees": 2.159
           },
           {
             "from": "2026-05-06",
             "Same weekday two weeks earlier (baseline)": 3.071,
-            "Poisson regression": 1.932,
-            "Gradient-boosted trees": 1.965
+            "Holt-Winters exponential smoothing": 1.941,
+            "Poisson regression": 1.915,
+            "Gradient-boosted trees": 1.938
           },
           {
             "from": "2026-05-20",
             "Same weekday two weeks earlier (baseline)": 2.857,
-            "Poisson regression": 2.208,
-            "Gradient-boosted trees": 2.317
+            "Holt-Winters exponential smoothing": 2.185,
+            "Poisson regression": 2.21,
+            "Gradient-boosted trees": 2.21
           },
           {
             "from": "2026-06-03",
             "Same weekday two weeks earlier (baseline)": 3.381,
-            "Poisson regression": 1.97,
-            "Gradient-boosted trees": 2.0
+            "Holt-Winters exponential smoothing": 2.042,
+            "Poisson regression": 1.993,
+            "Gradient-boosted trees": 1.999
           },
           {
             "from": "2026-06-17",
             "Same weekday two weeks earlier (baseline)": 2.643,
-            "Poisson regression": 1.992,
-            "Gradient-boosted trees": 2.068
+            "Holt-Winters exponential smoothing": 1.973,
+            "Poisson regression": 2.004,
+            "Gradient-boosted trees": 2.017
           },
           {
             "from": "2026-07-01",
             "Same weekday two weeks earlier (baseline)": 2.952,
-            "Poisson regression": 2.064,
-            "Gradient-boosted trees": 2.09
+            "Holt-Winters exponential smoothing": 1.955,
+            "Poisson regression": 2.094,
+            "Gradient-boosted trees": 2.079
           },
           {
             "from": "2026-07-15",
             "Same weekday two weeks earlier (baseline)": 2.833,
-            "Poisson regression": 2.125,
-            "Gradient-boosted trees": 2.146
+            "Holt-Winters exponential smoothing": 2.141,
+            "Poisson regression": 2.126,
+            "Gradient-boosted trees": 2.085
           },
           {
             "from": "2026-07-29",
             "Same weekday two weeks earlier (baseline)": 2.476,
-            "Poisson regression": 1.813,
-            "Gradient-boosted trees": 1.843
+            "Holt-Winters exponential smoothing": 1.88,
+            "Poisson regression": 1.85,
+            "Gradient-boosted trees": 1.793
           },
           {
             "from": "2026-08-12",
             "Same weekday two weeks earlier (baseline)": 2.452,
-            "Poisson regression": 1.77,
-            "Gradient-boosted trees": 1.724
+            "Holt-Winters exponential smoothing": 1.711,
+            "Poisson regression": 1.718,
+            "Gradient-boosted trees": 1.722
           },
           {
             "from": "2026-08-26",
             "Same weekday two weeks earlier (baseline)": 2.452,
-            "Poisson regression": 1.843,
-            "Gradient-boosted trees": 1.822
+            "Holt-Winters exponential smoothing": 1.91,
+            "Poisson regression": 1.827,
+            "Gradient-boosted trees": 1.816
           },
           {
             "from": "2026-09-09",
             "Same weekday two weeks earlier (baseline)": 2.69,
-            "Poisson regression": 1.565,
-            "Gradient-boosted trees": 1.566
+            "Holt-Winters exponential smoothing": 1.682,
+            "Poisson regression": 1.587,
+            "Gradient-boosted trees": 1.6
           }
         ],
         "summary": {
@@ -139,54 +156,131 @@
             "meanMae": 2.724,
             "stdMae": 0.322
           },
+          "Holt-Winters exponential smoothing": {
+            "meanMae": 1.966,
+            "stdMae": 0.165
+          },
           "Poisson regression": {
-            "meanMae": 1.95,
-            "stdMae": 0.201
+            "meanMae": 1.949,
+            "stdMae": 0.203
           },
           "Gradient-boosted trees": {
-            "meanMae": 1.962,
-            "stdMae": 0.202
+            "meanMae": 1.941,
+            "stdMae": 0.185
           }
         },
         "foldsWon": {
           "Same weekday two weeks earlier (baseline)": 0,
-          "Poisson regression": 9,
-          "Gradient-boosted trees": 3
+          "Holt-Winters exponential smoothing": 4,
+          "Poisson regression": 4,
+          "Gradient-boosted trees": 4
         }
+      },
+      "tuning": {
+        "linear": {
+          "settings": {
+            "alpha": 1.0
+          },
+          "tuningMae": 2.025,
+          "settingsTried": 4
+        },
+        "boosting": {
+          "settings": {
+            "learning_rate": 0.03,
+            "max_depth": 2
+          },
+          "tuningMae": 1.999,
+          "settingsTried": 9
+        }
+      },
+      "errorAnalysis": {
+        "worstDays": [
+          {
+            "date": "2026-11-02",
+            "weekday": "Monday",
+            "actual": 34,
+            "predicted": 19.9,
+            "error": 14.1,
+            "outsideRange": true
+          },
+          {
+            "date": "2026-09-28",
+            "weekday": "Monday",
+            "actual": 9,
+            "predicted": 19.3,
+            "error": -10.3,
+            "outsideRange": true
+          },
+          {
+            "date": "2026-11-10",
+            "weekday": "Tuesday",
+            "actual": 28,
+            "predicted": 17.8,
+            "error": 10.2,
+            "outsideRange": true
+          },
+          {
+            "date": "2026-10-21",
+            "weekday": "Wednesday",
+            "actual": 28,
+            "predicted": 18.1,
+            "error": 9.9,
+            "outsideRange": true
+          },
+          {
+            "date": "2026-09-26",
+            "weekday": "Saturday",
+            "actual": 23,
+            "predicted": 15.6,
+            "error": 7.4,
+            "outsideRange": true
+          }
+        ],
+        "daysUnderPredicted": 25,
+        "daysOverPredicted": 31,
+        "daysOutsideRange": 16,
+        "days": 56
+      },
+      "driftCheck": {
+        "recentMae": 2.051,
+        "backtestMae": 1.949,
+        "limit": 2.355,
+        "status": "stable",
+        "days": 28
       },
       "featureImportance": [
         {
           "group": "Shift",
-          "errorIncreasePercent": 4.7
+          "errorIncreasePercent": 3.9
         },
         {
           "group": "Calendar (weekday, time of year)",
-          "errorIncreasePercent": 4.0
+          "errorIncreasePercent": 3.1
         },
         {
           "group": "Past values (2 weeks to 1 year earlier)",
-          "errorIncreasePercent": 1.5
+          "errorIncreasePercent": 2.5
         }
       ],
       "residualChecks": {
-        "meanError": -0.271,
+        "meanError": -0.256,
         "meanErrorByShift": {
-          "evening": -0.495,
-          "morning": -0.07,
-          "night": -0.249
+          "evening": -0.46,
+          "morning": -0.006,
+          "night": -0.304
         },
         "meanErrorByWeekday": {
-          "Mon": -0.191,
-          "Tue": 0.075,
-          "Wed": -0.175,
-          "Thu": -1.151,
-          "Fri": -1.543,
-          "Sat": 0.969,
-          "Sun": 0.118
+          "Mon": -0.111,
+          "Tue": 0.101,
+          "Wed": -0.187,
+          "Thu": -1.075,
+          "Fri": -1.359,
+          "Sat": 0.88,
+          "Sun": -0.042
         },
         "dailyErrorAutocorrelation": {
-          "lag1": 0.082,
-          "lag7": 0.113,
+          "lag1": 0.083,
+          "lag7": 0.077,
           "bound95": 0.267
         },
         "note": "Errors near 0 with no pattern by shift or weekday, and autocorrelations inside the bound, mean the model has picked up the structure in the data."
@@ -196,7 +290,7 @@
       "label": "Tasks carried over",
       "model": "Poisson regression",
       "chosen": "linear",
-      "choiceReason": "Trees were not better by more than one standard error (-0.019 vs 0.009), so the simpler model is kept.",
+      "choiceReason": "Trees were not better by more than one standard error (-0.008 vs 0.008), so the simpler model is kept.",
       "trainingRows": 2172,
       "evaluation": {
         "testDays": 56,
@@ -207,38 +301,43 @@
             "mae": 1.125,
             "rmse": 1.635
           },
+          "Holt-Winters exponential smoothing": {
+            "mae": 0.964,
+            "rmse": 1.269
+          },
           "Poisson regression": {
-            "mae": 0.981,
-            "rmse": 1.265
+            "mae": 0.956,
+            "rmse": 1.255
           },
           "Gradient-boosted trees": {
-            "mae": 0.979,
-            "rmse": 1.309
+            "mae": 0.971,
+            "rmse": 1.289
           }
         },
         "perDay": {
           "model": {
-            "mae": 2.058,
-            "rmse": 2.572
+            "mae": 1.948,
+            "rmse": 2.526
           },
           "baseline": {
             "mae": 2.161,
             "rmse": 3.137
           }
         },
-        "maeModel": 0.981,
+        "maeModel": 0.956,
         "maeBaseline": 1.125,
-        "improvementPercent": 12.8,
+        "improvementPercent": 15.0,
         "range80": {
           "perShift": [
-            -1.18,
-            1.67
+            -1.09,
+            1.83
           ],
-          "perDay": [
-            -1.98,
-            3.15
+          "perDayScaled": [
+            -1.209,
+            1.896
           ],
-          "testCoveragePercent": 69.6
+          "calibrationDays": 364,
+          "testCoveragePercent": 78.6
         }
       },
       "backtest": {
@@ -248,74 +347,86 @@
           {
             "from": "2026-04-08",
             "Same weekday two weeks earlier (baseline)": 1.024,
-            "Poisson regression": 0.782,
-            "Gradient-boosted trees": 0.767
+            "Holt-Winters exponential smoothing": 0.8,
+            "Poisson regression": 0.77,
+            "Gradient-boosted trees": 0.776
           },
           {
             "from": "2026-04-22",
             "Same weekday two weeks earlier (baseline)": 1.048,
-            "Poisson regression": 1.024,
-            "Gradient-boosted trees": 1.013
+            "Holt-Winters exponential smoothing": 1.001,
+            "Poisson regression": 0.999,
+            "Gradient-boosted trees": 1.01
           },
           {
             "from": "2026-05-06",
             "Same weekday two weeks earlier (baseline)": 1.167,
-            "Poisson regression": 1.06,
-            "Gradient-boosted trees": 1.095
+            "Holt-Winters exponential smoothing": 1.061,
+            "Poisson regression": 1.072,
+            "Gradient-boosted trees": 1.079
           },
           {
             "from": "2026-05-20",
             "Same weekday two weeks earlier (baseline)": 1.167,
-            "Poisson regression": 0.992,
-            "Gradient-boosted trees": 1.014
+            "Holt-Winters exponential smoothing": 1.001,
+            "Poisson regression": 0.972,
+            "Gradient-boosted trees": 1.001
           },
           {
             "from": "2026-06-03",
             "Same weekday two weeks earlier (baseline)": 1.429,
-            "Poisson regression": 0.997,
-            "Gradient-boosted trees": 1.079
+            "Holt-Winters exponential smoothing": 1.015,
+            "Poisson regression": 1.035,
+            "Gradient-boosted trees": 1.006
           },
           {
             "from": "2026-06-17",
             "Same weekday two weeks earlier (baseline)": 1.19,
-            "Poisson regression": 0.779,
-            "Gradient-boosted trees": 0.791
+            "Holt-Winters exponential smoothing": 0.797,
+            "Poisson regression": 0.731,
+            "Gradient-boosted trees": 0.768
           },
           {
             "from": "2026-07-01",
             "Same weekday two weeks earlier (baseline)": 1.429,
-            "Poisson regression": 0.87,
-            "Gradient-boosted trees": 0.896
+            "Holt-Winters exponential smoothing": 0.838,
+            "Poisson regression": 0.861,
+            "Gradient-boosted trees": 0.854
           },
           {
             "from": "2026-07-15",
             "Same weekday two weeks earlier (baseline)": 1.31,
-            "Poisson regression": 0.844,
-            "Gradient-boosted trees": 0.859
+            "Holt-Winters exponential smoothing": 0.822,
+            "Poisson regression": 0.862,
+            "Gradient-boosted trees": 0.856
           },
           {
             "from": "2026-07-29",
             "Same weekday two weeks earlier (baseline)": 1.238,
-            "Poisson regression": 0.758,
-            "Gradient-boosted trees": 0.805
+            "Holt-Winters exponential smoothing": 0.716,
+            "Poisson regression": 0.744,
+            "Gradient-boosted trees": 0.788
           },
           {
             "from": "2026-08-12",
             "Same weekday two weeks earlier (baseline)": 1.333,
-            "Poisson regression": 1.183,
-            "Gradient-boosted trees": 1.198
+            "Holt-Winters exponential smoothing": 1.2,
+            "Poisson regression": 1.14,
+            "Gradient-boosted trees": 1.192
           },
           {
             "from": "2026-08-26",
             "Same weekday two weeks earlier (baseline)": 1.548,
-            "Poisson regression": 0.784,
-            "Gradient-boosted trees": 0.818
+            "Holt-Winters exponential smoothing": 0.815,
+            "Poisson regression": 0.81,
+            "Gradient-boosted trees": 0.795
           },
           {
             "from": "2026-09-09",
             "Same weekday two weeks earlier (baseline)": 1.024,
-            "Poisson regression": 0.752,
-            "Gradient-boosted trees": 0.72
+            "Holt-Winters exponential smoothing": 0.797,
+            "Poisson regression": 0.753,
+            "Gradient-boosted trees": 0.724
           }
         ],
         "summary": {
@@ -323,54 +434,131 @@
             "meanMae": 1.242,
             "stdMae": 0.171
           },
+          "Holt-Winters exponential smoothing": {
+            "meanMae": 0.905,
+            "stdMae": 0.145
+          },
           "Poisson regression": {
-            "meanMae": 0.902,
-            "stdMae": 0.144
+            "meanMae": 0.896,
+            "stdMae": 0.142
           },
           "Gradient-boosted trees": {
-            "meanMae": 0.921,
-            "stdMae": 0.153
+            "meanMae": 0.904,
+            "stdMae": 0.148
           }
         },
         "foldsWon": {
           "Same weekday two weeks earlier (baseline)": 0,
-          "Poisson regression": 9,
+          "Holt-Winters exponential smoothing": 4,
+          "Poisson regression": 5,
           "Gradient-boosted trees": 3
         }
       },
+      "tuning": {
+        "linear": {
+          "settings": {
+            "alpha": 1.0
+          },
+          "tuningMae": 0.949,
+          "settingsTried": 4
+        },
+        "boosting": {
+          "settings": {
+            "learning_rate": 0.03,
+            "max_depth": 2
+          },
+          "tuningMae": 0.985,
+          "settingsTried": 9
+        }
+      },
+      "errorAnalysis": {
+        "worstDays": [
+          {
+            "date": "2026-11-02",
+            "weekday": "Monday",
+            "actual": 14,
+            "predicted": 4.0,
+            "error": 10.0,
+            "outsideRange": true
+          },
+          {
+            "date": "2026-10-08",
+            "weekday": "Thursday",
+            "actual": 9,
+            "predicted": 3.5,
+            "error": 5.5,
+            "outsideRange": true
+          },
+          {
+            "date": "2026-10-21",
+            "weekday": "Wednesday",
+            "actual": 8,
+            "predicted": 3.4,
+            "error": 4.6,
+            "outsideRange": true
+          },
+          {
+            "date": "2026-10-26",
+            "weekday": "Monday",
+            "actual": 8,
+            "predicted": 3.7,
+            "error": 4.3,
+            "outsideRange": true
+          },
+          {
+            "date": "2026-11-17",
+            "weekday": "Tuesday",
+            "actual": 0,
+            "predicted": 3.7,
+            "error": -3.7,
+            "outsideRange": true
+          }
+        ],
+        "daysUnderPredicted": 23,
+        "daysOverPredicted": 33,
+        "daysOutsideRange": 12,
+        "days": 56
+      },
+      "driftCheck": {
+        "recentMae": 1.055,
+        "backtestMae": 0.896,
+        "limit": 1.18,
+        "status": "stable",
+        "days": 28
+      },
       "featureImportance": [
         {
-          "group": "Shift",
-          "errorIncreasePercent": 11.0
+          "group": "Calendar (weekday, time of year)",
+          "errorIncreasePercent": 3.9
         },
         {
-          "group": "Calendar (weekday, time of year)",
-          "errorIncreasePercent": 9.7
+          "group": "Shift",
+          "errorIncreasePercent": 1.1
         },
         {
           "group": "Past values (2 weeks to 1 year earlier)",
-          "errorIncreasePercent": 1.6
+          "errorIncreasePercent": 0.5
         }
       ],
       "residualChecks": {
-        "meanError": -0.012,
+        "meanError": 0.013,
         "meanErrorByShift": {
-          "evening": 0.075,
-          "morning": -0.115,
-          "night": 0.003
+          "evening": 0.082,
+          "morning": -0.105,
+          "night": 0.061
         },
         "meanErrorByWeekday": {
-          "Mon": 0.719,
-          "Tue": -0.276,
-          "Wed": -0.241,
-          "Thu": -0.017,
-          "Fri": -0.615,
-          "Sat": -0.149,
-          "Sun": 0.493
+          "Mon": 0.808,
+          "Tue": -0.222,
+          "Wed": -0.235,
+          "Thu": 0.059,
+          "Fri": -0.361,
+          "Sat": -0.255,
+          "Sun": 0.296
         },
         "dailyErrorAutocorrelation": {
-          "lag1": 0.123,
-          "lag7": 0.117,
+          "lag1": 0.104,
+          "lag7": 0.084,
           "bound95": 0.267
         },
         "note": "Errors near 0 with no pattern by shift or weekday, and autocorrelations inside the bound, mean the model has picked up the structure in the data."

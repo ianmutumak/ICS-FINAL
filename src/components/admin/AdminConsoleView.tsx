@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { AuditTrailView } from './AuditTrailView';
 import { useHandover } from '../../context/HandoverContext';
 import {
   ShieldAlert,
@@ -49,7 +50,7 @@ export const AdminConsoleView: React.FC = () => {
     setActiveTab,
   } = useHandover();
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'shifts' | 'incidents' | 'tasks' | 'overrides' | 'zones'>('users');
+  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'shifts' | 'incidents' | 'tasks' | 'overrides' | 'zones' | 'audit'>('users');
 
   // Override dialog state
   const [selectedShiftToOverride, setSelectedShiftToOverride] = useState<string | null>(null);
@@ -231,6 +232,16 @@ export const AdminConsoleView: React.FC = () => {
             }`}
           >
             Override Audit Ledger ({overrideLogs.length})
+          </button>
+          <button
+            onClick={() => setActiveAdminTab('audit')}
+            className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap ${
+              activeAdminTab === 'audit'
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+            }`}
+          >
+            Audit Trail
           </button>
         </div>
       </section>
@@ -773,6 +784,8 @@ export const AdminConsoleView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {activeAdminTab === 'audit' && <AuditTrailView />}
 
       {/* Tab 5: Override Audit Ledger */}
       {activeAdminTab === 'overrides' && (

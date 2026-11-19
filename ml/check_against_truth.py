@@ -48,6 +48,12 @@ def main() -> None:
     test = known[known["date"] >= test_start].sort_values(["date", "shift"]).copy()
     test["truth"] = [expected_handovers(d.date(), s, first_day) for d, s in zip(test["date"], test["shift"])]
 
+    # Use the same tuned settings as the real training run.
+    training.HISTORY = history
+    training.ACTIVE_PARAMS.clear()
+    tuned = training.tune_models(known, features, TARGET, test_start)
+    print("Tuned settings:", {name: info["settings"] for name, info in tuned.items()})
+
     print(f"Test weeks {test_start.date()} to {last_day.date()}, {len(test)} shifts")
     print(f"Noise in the data (actual - truth), mean: {(test[TARGET] - test['truth']).mean():+.3f}\n")
     print(f"{'Model':<45} {'mean error vs truth':>20} {'MAE vs truth':>13} {'MAE vs actual':>14}")

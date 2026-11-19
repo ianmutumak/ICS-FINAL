@@ -61,6 +61,10 @@ export interface SbarCase {
   }[];
   lastUpdated: string;
   updatedBy: string;
+  /** Set when the incoming staff member has acknowledged this update's safety warning. */
+  acknowledgedBy?: string;
+  acknowledgedById?: string;
+  acknowledgedAt?: string;
 }
 
 export interface EquipmentItem {
@@ -126,6 +130,9 @@ export interface HandoverRecord {
   signoff: DualSignoff;
   createdAt: string;
   completedAt?: string;
+  /** The administrator who approved the handover. */
+  approvedBy?: string;
+  approvedById?: string;
   isOverridden?: boolean;
   overrideReason?: string;
 }

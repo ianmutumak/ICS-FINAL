@@ -33,7 +33,9 @@ Outputs
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
+import warnings
 from datetime import timedelta
 from pathlib import Path
 
@@ -48,6 +50,7 @@ from sklearn.linear_model import PoissonRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 HERE = Path(__file__).parent
 ROOT = HERE.parent
@@ -55,6 +58,9 @@ SHIFTS = ("morning", "evening", "night")
 TARGETS = {"handovers": "Handovers", "tasks_carried_over": "Tasks carried over"}
 HORIZON_DAYS = 14
 BACKTEST_FOLDS = 12
+# The likely range is calibrated on a longer run of past forecasts than the model choice uses,
+# because a quantile needs many errors to be stable.
+RANGE_FOLDS = 26
 IMPORTANCE_REPEATS = 30
 # Waves per year used to describe the season; more waves can follow sharper peaks.
 YEARLY_HARMONICS = (1, 2, 3, 4)
@@ -63,8 +69,19 @@ HISTORY_DAYS_IN_APP = 42
 TARGET_MINUTES = 20
 SEED = 144861
 
+MODELS = ("baseline", "holtwinters", "linear", "boosting")
+TUNING_FOLDS = 6
+POISSON_ALPHAS = (1e-4, 1e-2, 1e-1, 1.0)
+BOOSTING_GRID = {"learning_rate": (0.03, 0.05, 0.1), "max_depth": (2, 3, 4)}
+
+# Settings found by tuning for the target being forecast; read by make_model.
+ACTIVE_PARAMS: dict[str, dict] = {}
+# The full history, for the one model (Holt-Winters) that works from the raw series.
+HISTORY: pd.DataFrame | None = None
+
 MODEL_LABELS = {
     "baseline": "Same weekday two weeks earlier (baseline)",
+    "holtwinters": "Holt-Winters exponential smoothing",
     "linear": "Poisson regression",
     "boosting": "Gradient-boosted trees",
 }
@@ -131,11 +148,12 @@ def make_model(name: str):
     if name == "linear":
         # Counts with multiplicative effects (shift x weekday x season x trend): a log-link
         # Poisson model fits that shape; plain linear regression adds the effects instead.
-        return make_pipeline(StandardScaler(), PoissonRegressor(alpha=1e-4, max_iter=1000))
+        settings = {"alpha": 1e-4, **ACTIVE_PARAMS.get("linear", {})}
+        return make_pipeline(StandardScaler(), PoissonRegressor(max_iter=1000, **settings))
     if name == "boosting":
+        settings = {"learning_rate": 0.05, "max_depth": 3, **ACTIVE_PARAMS.get("boosting", {})}
         return HistGradientBoostingRegressor(
-            loss="poisson", learning_rate=0.05, max_iter=300, max_depth=3,
-            min_samples_leaf=20, l2_regularization=1.0, random_state=SEED,
+            loss="poisson", max_iter=300, min_samples_leaf=20, l2_regularization=1.0, random_state=SEED, **settings,
         )
     raise ValueError(name)
 
@@ -164,9 +182,71 @@ FEATURE_GROUPS = {
 }
 
 
+def holt_winters_predict(rows: pd.DataFrame, target: str) -> np.ndarray:
+    """Classic seasonal smoothing, refitted every 14 days on the history that existed at the time.
+
+    For each 14-day block it sees every day up to the day before the block, which is more recent
+    information than the other models use (they only use inputs at least 14 days old). That makes
+    this a demanding comparison, not a handicapped one.
+    """
+    assert HISTORY is not None
+    first = rows["date"].min()
+    predicted = pd.Series(np.nan, index=rows.index, dtype=float)
+    for block_start in pd.date_range(first, rows["date"].max(), freq=f"{HORIZON_DAYS}D"):
+        block = rows[(rows["date"] >= block_start) & (rows["date"] < block_start + timedelta(days=HORIZON_DAYS))]
+        for shift in SHIFTS:
+            series = (
+                HISTORY[(HISTORY["shift"] == shift) & (HISTORY["date"] < block_start)]
+                .set_index("date")[target].asfreq("D").astype(float)
+            )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                fitted = ExponentialSmoothing(
+                    series, trend="add", damped_trend=True, seasonal="add",
+                    seasonal_periods=7, initialization_method="estimated",
+                ).fit()
+                forecast = np.clip(np.asarray(fitted.forecast(HORIZON_DAYS)), 0, None)
+            by_date = dict(zip(pd.date_range(block_start, periods=HORIZON_DAYS), forecast))
+            wanted = block[block["shift"] == shift]
+            predicted.loc[wanted.index] = [by_date[day] for day in wanted["date"]]
+    return predicted.to_numpy()
+
+
 def fit_and_predict(name: str, train: pd.DataFrame, rows: pd.DataFrame, features: list[str], target: str):
+    if name == "holtwinters":
+        return None, holt_winters_predict(rows, target)
     model = None if name == "baseline" else make_model(name).fit(train[features], train[target])
     return model, predict(name, model, rows, features, target)
+
+
+def tune_models(known: pd.DataFrame, features: list[str], target: str, test_start: pd.Timestamp) -> dict:
+    """Pick each learned model's settings on six past forecasts that come BEFORE the twelve used to compare models.
+
+    Keeping the tuning folds separate means the comparison is not flattered by settings chosen on the same weeks.
+    """
+    candidates = {
+        "linear": [{"alpha": alpha} for alpha in POISSON_ALPHAS],
+        "boosting": [dict(zip(BOOSTING_GRID, values)) for values in itertools.product(*BOOSTING_GRID.values())],
+    }
+    chosen = {}
+    for name, grid in candidates.items():
+        scores = []
+        for params in grid:
+            ACTIVE_PARAMS[name] = params
+            errors_by_fold = []
+            for fold in range(BACKTEST_FOLDS + TUNING_FOLDS, BACKTEST_FOLDS, -1):
+                fold_start = test_start - timedelta(days=fold * HORIZON_DAYS)
+                train = known[known["date"] < fold_start]
+                rows = known[(known["date"] >= fold_start) & (known["date"] < fold_start + timedelta(days=HORIZON_DAYS))]
+                if len(train) < 400 or rows.empty:
+                    continue
+                _, predicted = fit_and_predict(name, train, rows, features, target)
+                errors_by_fold.append(mean_absolute_error(rows[target], predicted))
+            scores.append((float(np.mean(errors_by_fold)), params))
+        best_score, best_params = min(scores, key=lambda item: item[0])
+        ACTIVE_PARAMS[name] = best_params
+        chosen[name] = {"settings": best_params, "tuningMae": round(best_score, 3), "settingsTried": len(grid)}
+    return chosen
 
 
 def daily_totals(rows: pd.DataFrame, target: str, predicted: np.ndarray) -> pd.DataFrame:
@@ -176,7 +256,7 @@ def daily_totals(rows: pd.DataFrame, target: str, predicted: np.ndarray) -> pd.D
 def backtest(known: pd.DataFrame, features: list[str], target: str, test_start: pd.Timestamp) -> dict:
     """Rolling-origin evaluation over the weeks before the test period."""
     folds = []
-    residuals = {name: {"shift": [], "day": []} for name in ("baseline", "linear", "boosting")}
+    residuals = {name: {"shift": [], "day": []} for name in MODELS}
     for fold in range(BACKTEST_FOLDS, 0, -1):
         fold_start = test_start - timedelta(days=fold * HORIZON_DAYS)
         fold_end = fold_start + timedelta(days=HORIZON_DAYS)
@@ -197,6 +277,30 @@ def backtest(known: pd.DataFrame, features: list[str], target: str, test_start: 
         summary[name] = {"meanMae": round(float(values.mean()), 3), "stdMae": round(float(values.std(ddof=1)), 3)}
     wins = {name: sum(1 for fold in folds if fold[name] == min(fold[n] for n in residuals)) for name in residuals}
     return {"folds": folds, "summary": summary, "wins": wins, "residuals": residuals}
+
+
+def calibrate_range(known: pd.DataFrame, features: list[str], target: str, test_start: pd.Timestamp, model_name: str) -> dict:
+    """Likely range for a day's total, from the chosen model's past forecast errors.
+
+    Counts vary more when they are higher (a Poisson count has variance equal to its mean), so each
+    error is divided by the square root of the forecast before taking quantiles. The range is then
+    the forecast plus or minus those quantiles times the square root of the new forecast: wider on
+    busy days and narrower on quiet ones. Only days before the test period are used.
+    """
+    scaled, shift_errors = [], []
+    for fold in range(RANGE_FOLDS, 0, -1):
+        fold_start = test_start - timedelta(days=fold * HORIZON_DAYS)
+        train = known[known["date"] < fold_start]
+        rows = known[(known["date"] >= fold_start) & (known["date"] < fold_start + timedelta(days=HORIZON_DAYS))].sort_values(["date", "shift"])
+        if len(train) < 400 or rows.empty:
+            continue
+        _, predicted = fit_and_predict(model_name, train, rows, features, target)
+        daily = daily_totals(rows, target, predicted)
+        scaled.extend(((daily[target] - daily["predicted"]) / np.sqrt(daily["predicted"].clip(lower=1.0))).to_numpy())
+        shift_errors.extend(rows[target].to_numpy() - predicted)
+    low, high = np.quantile(scaled, [0.10, 0.90])
+    shift_low, shift_high = np.quantile(shift_errors, [0.10, 0.90])
+    return {"scaledLow": float(low), "scaledHigh": float(high), "shiftLow": float(shift_low), "shiftHigh": float(shift_high), "days": len(scaled)}
 
 
 def choose_model(folds: dict) -> tuple[str, str]:
@@ -262,6 +366,50 @@ def residual_checks(rows: pd.DataFrame, target: str, predicted: np.ndarray) -> d
     }
 
 
+def error_analysis(daily: pd.DataFrame, target: str, spread: dict) -> dict:
+    """The days the chosen model got most wrong, and whether it errs one way more than the other."""
+    frame = daily.assign(error=daily[target] - daily["predicted"])
+    root = np.sqrt(frame["predicted"].clip(lower=1.0))
+    frame["outsideRange"] = (frame["error"] < spread["scaledLow"] * root) | (frame["error"] > spread["scaledHigh"] * root)
+    worst = frame.reindex(frame["error"].abs().sort_values(ascending=False).index).head(5)
+    return {
+        "worstDays": [
+            {
+                "date": day.date().isoformat(),
+                "weekday": day.day_name(),
+                "actual": int(row[target]),
+                "predicted": round(float(row["predicted"]), 1),
+                "error": round(float(row["error"]), 1),
+                "outsideRange": bool(row["outsideRange"]),
+            }
+            for day, row in worst.iterrows()
+        ],
+        "daysUnderPredicted": int((frame["error"] > 0).sum()),
+        "daysOverPredicted": int((frame["error"] < 0).sum()),
+        "daysOutsideRange": int(frame["outsideRange"].sum()),
+        "days": int(len(frame)),
+    }
+
+
+def drift_check(test: pd.DataFrame, target: str, predicted: np.ndarray, folds: dict, chosen: str) -> dict:
+    """Has the model got worse lately? Compares the last 28 days with its usual backtest error.
+
+    A real deployment would run this every time new records arrive and retrain when it says "review".
+    """
+    recent_cut = test["date"].max() - timedelta(days=27)
+    mask = (test["date"] >= recent_cut).to_numpy()
+    recent_mae = float(mean_absolute_error(test[target].to_numpy()[mask], predicted[mask]))
+    usual = np.array([fold[chosen] for fold in folds["folds"]])
+    limit = float(usual.mean() + 2 * usual.std(ddof=1))
+    return {
+        "recentMae": round(recent_mae, 3),
+        "backtestMae": round(float(usual.mean()), 3),
+        "limit": round(limit, 3),
+        "status": "stable" if recent_mae <= limit else "review",
+        "days": 28,
+    }
+
+
 def forecast_target(history: pd.DataFrame, target: str) -> dict:
     last_day = history["date"].max()
     frame, features = build_features(add_future_rows(history), target)
@@ -272,19 +420,25 @@ def forecast_target(history: pd.DataFrame, target: str) -> dict:
     development = known[known["date"] < test_start]
     test = known[known["date"] >= test_start].sort_values(["date", "shift"])
 
+    # 0. Tune each learned model on weeks that come before the comparison folds.
+    global HISTORY
+    HISTORY = history
+    ACTIVE_PARAMS.clear()
+    tuning = tune_models(known, features, target, test_start)
+
     # 1. Choose the model by rolling-origin backtesting on the weeks before the test period.
     folds = backtest(known, features, target, test_start)
     chosen, choice_reason = choose_model(folds)
 
     # 2. An 80% range from the chosen model's backtest errors (the test period is not used for this).
-    shift_low, shift_high = np.quantile(folds["residuals"][chosen]["shift"], [0.10, 0.90])
-    daily_low, daily_high = np.quantile(folds["residuals"][chosen]["day"], [0.10, 0.90])
+    spread = calibrate_range(known, features, target, test_start, chosen)
+    shift_low, shift_high = spread["shiftLow"], spread["shiftHigh"]
 
     # 3. Score every candidate once on the untouched test weeks.
     test_results = {}
     test_predictions = {}
     chosen_model = None
-    for name in ("baseline", "linear", "boosting"):
+    for name in MODELS:
         model, test_predictions[name] = fit_and_predict(name, development, test, features, target)
         test_results[name] = errors(test[target].to_numpy(), test_predictions[name])
         if name == chosen:
@@ -297,11 +451,14 @@ def forecast_target(history: pd.DataFrame, target: str) -> dict:
         "baseline": errors(daily[target].to_numpy(), daily["baseline"].to_numpy()),
     }
     improvement = 1 - test_results[chosen]["mae"] / test_results["baseline"]["mae"]
-    inside = (daily[target] >= daily["predicted"] + daily_low) & (daily[target] <= daily["predicted"] + daily_high)
+    root = np.sqrt(daily["predicted"].clip(lower=1.0))
+    inside = (daily[target] >= daily["predicted"] + spread["scaledLow"] * root) & (daily[target] <= daily["predicted"] + spread["scaledHigh"] * root)
 
     # 4. Diagnostics on the test weeks.
     importance = group_importance(chosen, chosen_model, test, features, target)
     checks = residual_checks(test, target, test_predictions[chosen])
+    analysis = error_analysis(daily, target, spread)
+    drift = drift_check(test, target, test_predictions[chosen], folds, chosen)
 
     # 5. Refit on everything and forecast the next 14 days.
     final_model = make_model(chosen).fit(known[features], known[target])
@@ -313,8 +470,8 @@ def forecast_target(history: pd.DataFrame, target: str) -> dict:
         entry = {
             "date": day.date().isoformat(),
             "value": round(total, 1),
-            "low": round(max(total + daily_low, 0.0), 1),
-            "high": round(max(total + daily_high, 0.0), 1),
+            "low": round(max(total + spread["scaledLow"] * np.sqrt(max(total, 1.0)), 0.0), 1),
+            "high": round(max(total + spread["scaledHigh"] * np.sqrt(max(total, 1.0)), 0.0), 1),
         }
         for _, row in rows.iterrows():
             entry[row["shift"]] = round(float(row["predicted"]), 1)
@@ -340,7 +497,8 @@ def forecast_target(history: pd.DataFrame, target: str) -> dict:
             "improvementPercent": round(100 * improvement, 1),
             "range80": {
                 "perShift": [round(float(shift_low), 2), round(float(shift_high), 2)],
-                "perDay": [round(float(daily_low), 2), round(float(daily_high), 2)],
+                "perDayScaled": [round(spread["scaledLow"], 3), round(spread["scaledHigh"], 3)],
+                "calibrationDays": spread["days"],
                 "testCoveragePercent": round(100 * float(inside.mean()), 1),
             },
         },
@@ -348,12 +506,15 @@ def forecast_target(history: pd.DataFrame, target: str) -> dict:
             "folds": BACKTEST_FOLDS,
             "foldDays": HORIZON_DAYS,
             "perFoldMae": [
-                {"from": fold["from"], **{MODEL_LABELS[name]: fold[name] for name in ("baseline", "linear", "boosting")}}
+                {"from": fold["from"], **{MODEL_LABELS[name]: fold[name] for name in MODELS}}
                 for fold in folds["folds"]
             ],
             "summary": {MODEL_LABELS[name]: value for name, value in folds["summary"].items()},
             "foldsWon": {MODEL_LABELS[name]: value for name, value in folds["wins"].items()},
         },
+        "tuning": tuning,
+        "errorAnalysis": analysis,
+        "driftCheck": drift,
         "featureImportance": importance,
         "residualChecks": checks,
         "history": [{"date": day.date().isoformat(), "value": int(value)} for day, value in recent_daily.items()],
@@ -439,7 +600,7 @@ def save_chart(results: dict[str, dict], path: Path) -> None:
 
 
 def save_backtest_chart(results: dict[str, dict], path: Path) -> None:
-    styles = {"baseline": ("#a09887", ":"), "linear": ("#1f6b54", "-"), "boosting": ("#c27c0e", "--")}
+    styles = {"baseline": ("#a09887", ":"), "holtwinters": ("#4a6fa5", "-."), "linear": ("#1f6b54", "-"), "boosting": ("#c27c0e", "--")}
     figure, axes = plt.subplots(len(results), 1, figsize=(10, 3.4 * len(results)), constrained_layout=True)
     for axis, result in zip(np.atleast_1d(axes), results.values()):
         folds = result["_folds"]
@@ -452,7 +613,7 @@ def save_backtest_chart(results: dict[str, dict], path: Path) -> None:
         axis.set_ylim(bottom=0)
         axis.grid(axis="y", color="#e2ddd1", linewidth=0.6)
         axis.spines[["top", "right"]].set_visible(False)
-        axis.legend(frameon=False, ncols=3, fontsize=9)
+        axis.legend(frameon=False, ncols=2, fontsize=9)
     figure.savefig(path, dpi=150)
     plt.close(figure)
 
@@ -505,6 +666,7 @@ def main() -> None:
     for name, result in results.items():
         evaluation = result["evaluation"]
         print(f"\n{result['label']}: chose {result['model']} (trained on {result['trainingRows']:,} rows)")
+        print(f"   tuning     " + "; ".join(f"{name}: {info['settings']} (MAE {info['tuningMae']})" for name, info in result["tuning"].items()))
         for model, figures in evaluation["perShift"].items():
             print(f"   per shift  {model:<45} MAE {figures['mae']:.3f}  RMSE {figures['rmse']:.3f}")
         print(f"   per day    model MAE {evaluation['perDay']['model']['mae']:.3f}  baseline MAE {evaluation['perDay']['baseline']['mae']:.3f}")
@@ -518,6 +680,9 @@ def main() -> None:
         lags = checks["dailyErrorAutocorrelation"]
         print(f"   residuals  mean {checks['meanError']:+.3f}  autocorrelation lag1 {lags['lag1']}  lag7 {lags['lag7']}  (95% bound {lags['bound95']})")
         print(f"   choice     {result['choiceReason']}")
+        analysis = result["errorAnalysis"]
+        print(f"   worst days " + "; ".join(f"{d['date']} {d['weekday'][:3]} actual {d['actual']} predicted {d['predicted']}" for d in analysis["worstDays"][:3]))
+        print(f"   drift      recent MAE {result['driftCheck']['recentMae']} vs limit {result['driftCheck']['limit']}: {result['driftCheck']['status']}")
     print(f"\nWrote {reports / 'metrics.json'}, the charts in {reports} and {app_path}")
 
 
