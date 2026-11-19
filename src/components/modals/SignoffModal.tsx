@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHandover } from '../../context/HandoverContext';
+import { unacknowledgedWarnings } from '../../lib/shiftRules';
 import { DualSignoffStampIcon, CustodyShieldIcon } from '../common/CustomSvgIcons';
 import { X, CheckCircle, ShieldAlert, KeyRound, Archive, ArrowRight } from 'lucide-react';
 
@@ -112,6 +113,13 @@ export const SignoffModal: React.FC<SignoffModalProps> = ({ isOpen, onClose }) =
         You signed as the outgoing staff member. The staff member taking over must sign in with their own account to accept this handover.
       </p>
     );
+  } else if (unacknowledgedWarnings(activeHandover).length > 0) {
+    const waiting = unacknowledgedWarnings(activeHandover).length;
+    incomingPending = (
+      <p className="text-xs font-medium leading-relaxed text-amber-800 dark:text-amber-300">
+        Acknowledge {waiting === 1 ? 'the safety warning' : `all ${waiting} safety warnings`} on the handover screen before signing.
+      </p>
+    );
   } else {
     incomingPending = (
       <button
@@ -201,7 +209,12 @@ export const SignoffModal: React.FC<SignoffModalProps> = ({ isOpen, onClose }) =
               <CustodyShieldIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Outgoing and incoming staff signatures recorded</span>
             </div>
-            {signoff.verificationHash && <div className="mt-1 font-mono text-[11px] text-emerald-800 dark:text-emerald-400 break-all">{signoff.verificationHash}</div>}
+            {signoff.verificationHash && (
+              <div className="mt-1.5">
+                <span className="text-[11px] font-semibold text-emerald-900 dark:text-emerald-300">Record seal (SHA-256)</span>
+                <div className="font-mono text-[11px] text-emerald-800 dark:text-emerald-400 break-all">{signoff.verificationHash}</div>
+              </div>
+            )}
           </div>
         )}
 

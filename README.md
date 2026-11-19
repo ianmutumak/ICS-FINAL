@@ -11,14 +11,26 @@ University.
 ## What it does
 
 - **Record:** staff start a shift and log SBAR updates as things happen, with an
-  optional safety warning shown at the top of an update.
+  optional safety warning shown at the top of an update. Equipment in custody is
+  listed and checked during the handover.
 - **Sign:** the outgoing staff member signs first, then the incoming staff
-  member signs with a different account.
+  member signs with a different account. The incoming staff member must
+  acknowledge every safety warning before they can sign. Updates and equipment
+  cannot change once the outgoing staff member has signed.
+- **Seal:** each signed handover gets a SHA-256 seal; a record that changes after
+  signing is reported.
 - **Approve:** an administrator approves the signed handover. It is archived and
-  the next shift opens with open items carried over.
-- **Administer:** manage users, facility zones, incidents and the override log.
+  the next shift opens with open items carried over; safety warnings must be
+  acknowledged again.
+- **Watch:** a live Handover Effectiveness Index (0 to 100) shows how complete the
+  handover is, and a banner flags a shift left unsigned for 9.5 hours or a signed
+  handover left unapproved for 4 hours.
+- **Administer:** manage users, facility zones, incidents, the override log and a
+  read-only audit trail of who did what and when.
 - **Measure:** statistics and charts on handovers, with a machine learning
-  forecast of the workload for the next 14 days.
+  forecast of the workload for the next 14 days. The administrator can plan for or
+  dismiss each forecast warning, and the decision is recorded in the audit trail.
+- **Print:** a handover can be printed from the handover screen.
 
 ## Tech stack
 
@@ -69,9 +81,9 @@ on a synthetic history. The code is in `ml/`.
 - **Inputs:** the shift, the day of the week, the time of year, and past values
   from 2 to 4 weeks earlier and from the same fortnight a year earlier. Every
   input is at least 14 days old, so one model covers the whole 14-day horizon.
-- **Candidates:** a baseline (the same weekday two weeks earlier), Poisson
-  regression (a linear model on the log scale, suited to counts) and
-  gradient-boosted trees.
+- **Candidates:** a baseline (the same weekday two weeks earlier), Holt-Winters
+  exponential smoothing (a classic statistical method), Poisson regression (a
+  linear model on the log scale, suited to counts) and gradient-boosted trees.
 - **Choosing a model:** rolling-origin backtesting over the 24 weeks before the
   test period, in 12 two-week folds. For each fold the models are trained on
   everything before it. The simpler Poisson regression is kept unless the trees
@@ -85,37 +97,62 @@ on a synthetic history. The code is in `ml/`.
 
 | | Handovers | Tasks carried over |
 |---|---|---|
-| Model chosen | Poisson regression | Poisson regression |
-| Backtest error per shift, model (12 folds) | 1.95 ± 0.20 | 0.90 ± 0.14 |
-| Backtest error per shift, baseline | 2.72 ± 0.32 | 1.24 ± 0.17 |
-| Folds where the model was best | 9 of 12 | 9 of 12 |
-| Test error per shift, model vs baseline | 2.01 vs 2.53 (21% lower) | 0.98 vs 1.13 (13% lower) |
-| Test days inside the 80% range | 71% | 70% |
+| Backtest error per shift, baseline (12 folds) | 2.72 ± 0.32 | 1.24 ± 0.17 |
+| Backtest error per shift, Holt-Winters | 1.97 ± 0.17 | 0.91 ± 0.14 |
+| Backtest error per shift, Poisson regression | 1.95 ± 0.20 | 0.90 ± 0.14 |
+| Backtest error per shift, gradient-boosted trees | 1.94 ± 0.18 | 0.90 ± 0.15 |
+| Folds each method was best (baseline, Holt-Winters, Poisson, trees) | 0, 4, 4, 4 | 0, 4, 5, 3 |
+| Model used in the app | Poisson regression | Poisson regression |
+| Test error per shift: baseline, Poisson regression | 2.53, 1.97 (22% lower) | 1.12, 0.96 (15% lower) |
+| Test error per shift: Holt-Winters, trees | 1.96, 1.95 | 0.96, 0.97 |
+| Test days inside the 80% range | 71% | 79% |
 
-Errors are mean absolute errors. The two learned models are within one
-standard error of each other on both targets; both beat the baseline on every
-fold.
+Errors are mean absolute errors. **The three methods that look at the seasonal
+pattern are statistically tied**: Holt-Winters smoothing, Poisson regression and
+boosted trees differ by far less than the fold-to-fold variation, and every one
+of them beats the baseline on every fold. This is an honest result: on three
+years of daily counts with a regular pattern, a classic statistical method does
+as well as the machine learning models. Poisson regression is used in the app
+because the simpler learned model is kept unless the trees are clearly better,
+and because it is quick to retrain and easy to explain.
+
+### Tuning
+
+Settings were tuned on six past forecasts that come before the twelve used to
+compare models, so the comparison is not flattered by settings chosen on the same
+weeks. Poisson regression: regularisation 1.0 (handovers) and
+1.0 (tasks). Trees: {'learning_rate': 0.03, 'max_depth': 2} and {'learning_rate': 0.03, 'max_depth': 2}.
 
 ### Diagnostics
 
-- **Bias:** on the test weeks the model over-predicts by 0.27 handovers per
-  shift and is unbiased for tasks carried over (0.01). Day-to-day correlation in
-  its errors is inside the 95% bound, so no pattern is left over in time.
+- **Bias:** on the test weeks the model over-predicts by 0.26 handovers per
+  shift and is nearly unbiased for tasks carried over (+0.01). Day-to-day correlation
+  in its errors is inside the 95% bound, so no pattern is left over in time.
+- **Error analysis:** the worst test days for handovers were 2026-11-02 (Mon, actual 34, forecast 19.9), 2026-09-28 (Mon, actual 9, forecast 19.3), 2026-11-10 (Tue, actual 28, forecast 17.8).
+  Misses like these come from random variation and occasional spike days in the
+  generated data, which no method can predict; they are not a failure to follow
+  the pattern.
 - **Weekdays:** the test errors look large on Thursdays, Fridays and Saturdays
-  (1 to 1.5 handovers per shift). Comparing with the generator's true values shows
+  (about 1 handover per shift). Comparing with the generator's true values shows
   that those days happened to fall well away from their expected level in those
-  eight weeks; the model's own gap to the true values is under 0.4 on every weekday.
-- **What the model relies on:** scrambling the shift or the calendar inputs raises
-  the error by 4 to 11%; scrambling past values raises it by under 2%. The model
-  has mostly learned the regular calendar pattern, which is how the data was made.
+  eight weeks; the model's own gap to the true values is under 0.3 on every weekday.
+- **What the model relies on:** scrambling the shift, calendar or past-value inputs
+  raises the error by only 2.5 to 3.9% for handovers
+  (shift 3.9%, calendar 3.1%, past values 2.5%). The inputs overlap, so none is
+  critical alone. The model has learned the regular pattern, which is how the data was made.
 - **A problem the diagnostics caught:** an earlier version included an explicit
   trend term. Comparing its forecasts with the generator's true values showed it
   over-predicting more each week it looked ahead, because recent values already
   carry the current level and the trend added growth on top. Removing it halved
   the gap to the true values.
-- **The 80% range is a little narrow:** it held on 70 to 71% of test days rather
-  than 80%. With 56 test days that is within sampling error, but it was not
+- **The 80% range:** it is calibrated on 26 past forecasts and widens with the
+  size of the forecast, because counts vary more when they are higher. It held on
+  71% (handovers) and 79% (tasks carried over) of the 56 test days. The shortfall
+  for handovers comes from the test weeks, not from the range. The range was not
   adjusted on the test weeks, since that would make the check meaningless.
+- **Drift check:** the error over the last 28 days (2.051 for handovers) is compared with the usual backtest
+  error plus two standard deviations (2.355); it reads "stable". A deployment would run this each time new
+  records arrive and retrain when it reads "review".
 
 To regenerate the data and retrain (Python 3.10 or later):
 
@@ -152,14 +189,16 @@ can be retrained on them.
 |---|---|
 | `npm run dev` | Starts the Vite dev server |
 | `npm run build` | Builds the client into `dist/` |
-| `npm start` | Serves the built client |
+| `npm start` | Serves the built client; `/healthz` reports whether a build is present |
 | `npm run lint` | Type-checks the project |
+| `npm test` | Runs the automated unit tests |
 | `npm run clean` | Removes `dist/` |
 
 ## Project structure
 
 ```
-server.js                  Express server that hosts the built app
+server.js                  Express server that hosts the built app, with a /healthz check
+firebase.json              Firebase Hosting and Firestore configuration
 firestore.rules            Firestore security rules
 ml/                        Synthetic data generator and forecast model (Python)
 src/
@@ -168,7 +207,7 @@ src/
     auth/                  Sign-in and registration
     dashboard/             The handover screen
     modals/                Start shift, add update, review and sign
-    admin/                 Admin console
+    admin/                 Admin console and audit trail
     analytics/             Statistics, charts, forecast
     layout/, common/       Header and icons
   context/
@@ -176,9 +215,11 @@ src/
     useAuth.ts             Staff accounts and the current session
     useFacility.ts         Zones, categories and incidents
     useShift.ts            Open handover, tasks, signatures, approval, archive
+    useForecastReview.ts   Administrator decisions about forecast warnings
     storage.ts             Browser storage keys and helpers
   lib/
-    shiftRules.ts          Shift windows, codes, durations, effectiveness index
+    shiftRules.ts          Shift windows, SHA-256 seal, effectiveness index, overdue alerts
+    auditTrail.ts          Builds the audit trail from handovers, overrides and decisions
     firebase.ts            Firebase set-up
     firestoreService.ts    Reading and writing Firestore records
     statisticsSnapshot.ts  Aggregate figures for the Statistics screen
@@ -189,13 +230,29 @@ src/
   types/                   Shared types
 ```
 
+Automated tests sit beside the code they test (`*.test.ts`). The helpers they
+share are in `src/lib/testHelpers.ts`.
+
+## Hosting
+
+The application is a browser client that talks to Firestore, so Firebase Hosting
+is the natural home for it: `npm run build`, then `firebase deploy --only hosting`
+(configuration in `firebase.json`). Do not deploy with the open database rules.
+
 ## Prototype limitations
 
 This is an academic prototype. Do not use it with real operational or personal
 data until these are addressed:
 
+- Each signed handover carries a SHA-256 seal of its updates, signers and signing
+  times, computed in the browser. It shows whether a record changed after signing,
+  but it is not tamper-proof against someone who can edit the database.
+- Writes made while offline are queued by the Firestore local cache and sent when
+  the connection returns; conflicts are resolved as last write wins.
 - Sign-in is checked in the browser only, with PINs kept in browser storage. It
-  is a demonstration login, not real authentication.
+  is a demonstration login, not real authentication. The locks on signed handovers
+  and the acknowledgement rule are enforced by the application, not by the
+  database.
 - `firestore.rules` currently allows public read and write.
 - Staff accounts are stored per browser and are not shared between devices.
 - The forecast is trained on synthetic data and has not been validated against

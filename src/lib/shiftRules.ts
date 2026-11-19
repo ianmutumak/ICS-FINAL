@@ -1,4 +1,4 @@
-import { HandoverEffectivenessIndex, HandoverRecord, ShiftType, UserStaff } from '../types';
+import { HandoverEffectivenessIndex, HandoverRecord, SbarCase, ShiftType, UserStaff } from '../types';
 
 export const SHIFT_WINDOWS: Record<ShiftType, string> = {
   morning: '07:00 - 15:30',
@@ -21,11 +21,34 @@ export function localDateString(date = new Date()): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-/** Whole minutes between two ISO timestamps. 0 means the duration could not be measured. */
+/** Minutes between two ISO timestamps, to a tenth of a minute. 0 means the duration could not be measured. */
 export function minutesBetween(fromIso: string, toIso: string): number {
   const ms = new Date(toIso).getTime() - new Date(fromIso).getTime();
   if (!Number.isFinite(ms) || ms < 0) return 0;
-  return Math.max(1, Math.ceil(ms / 60000));
+  return Math.max(0.1, Math.round(ms / 6000) / 10);
+}
+
+/**
+ * A SHA-256 fingerprint of a signed handover: its updates, the two signers and the two signing
+ * times. Changing any of those afterwards gives a different fingerprint, so the stored value shows
+ * whether the record is still the one that was signed. Returns undefined where the browser has no
+ * Web Crypto (an insecure page).
+ */
+export async function sealHandover(shift: HandoverRecord): Promise<string | undefined> {
+  if (typeof crypto === 'undefined' || !crypto.subtle) return undefined;
+  const { signoff } = shift;
+  const content = JSON.stringify({
+    code: shift.handoverCode,
+    date: shift.shiftDate,
+    shift: shift.shiftType,
+    area: shift.wardOrDepartment,
+    updates: shift.cases.map((c) => [c.subjectRef, c.situation, c.background, c.assessment, c.recommendation, c.isolationOrHazardAlert ?? '', c.acknowledgedById ?? '', c.acknowledgedAt ?? '']),
+    equipment: shift.equipment.map((e) => [e.name, e.assetTag, e.status, e.custodyChecked]),
+    outgoing: [signoff.outgoingStaffId, signoff.outgoingSignedAt],
+    incoming: [signoff.incomingStaffId, signoff.incomingSignedAt],
+  });
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(content));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export const formatTime = (date: Date | string = new Date()) =>
@@ -39,19 +62,51 @@ export function toPublicStaff(staff: UserStaff): UserStaff {
 
 export const isClosedShift = (shift: HandoverRecord) => shift.status === 'completed' || shift.status === 'archived';
 
+export const hasSafetyWarning = (c: SbarCase) => Boolean(c.isolationOrHazardAlert?.trim());
+export const isCompleteSbar = (c: SbarCase) =>
+  Boolean(c.situation?.trim() && c.background?.trim() && c.assessment?.trim() && c.recommendation?.trim());
+
+/** Updates whose safety warning the incoming staff member has not yet acknowledged. */
+export const unacknowledgedWarnings = (shift: HandoverRecord) =>
+  shift.cases.filter((c) => hasSafetyWarning(c) && !c.acknowledgedAt);
+
+/** A shift lasts 8.5 hours, so a handover still unsigned well after that is overdue. */
+export const UNSIGNED_OVERDUE_HOURS = 9.5;
+/** An administrator should approve a fully signed handover within this time. */
+export const APPROVAL_OVERDUE_HOURS = 4;
+
+export interface HandoverAlert {
+  kind: 'unsigned_overdue' | 'approval_overdue';
+  hours: number;
+  message: string;
+}
+
+/** Flags a handover that has been waiting too long for its signatures or for approval. */
+export function handoverAlert(shift: HandoverRecord, now: Date = new Date()): HandoverAlert | null {
+  if (!shift.handoverCode || isClosedShift(shift)) return null;
+  const hoursSince = (iso?: string) => (iso ? (now.getTime() - new Date(iso).getTime()) / 3600000 : 0);
+  if (shift.signoff.incomingConfirmed) {
+    const hours = hoursSince(shift.signoff.incomingSignedAt);
+    return hours > APPROVAL_OVERDUE_HOURS
+      ? { kind: 'approval_overdue', hours, message: `Signed by both staff ${Math.floor(hours)} hours ago and still waiting for administrator approval.` }
+      : null;
+  }
+  const hours = hoursSince(shift.createdAt);
+  return hours > UNSIGNED_OVERDUE_HOURS
+    ? { kind: 'unsigned_overdue', hours, message: `This shift started ${Math.floor(hours)} hours ago and has not been signed by both staff members.` }
+    : null;
+}
+
 /** Handover Effectiveness Index: SBAR completeness (40), safety acknowledgement (35), equipment custody (25). */
 export function calculateHEI(shift: HandoverRecord): HandoverEffectivenessIndex {
   const totalCases = shift.cases.length;
-  const completedSbarCases = shift.cases.filter(
-    (c) => c.situation?.trim() && c.assessment?.trim() && c.recommendation?.trim()
-  ).length;
+  const completedSbarCases = shift.cases.filter(isCompleteSbar).length;
   const sbarCompleteness = totalCases > 0 ? Math.round((completedSbarCases / totalCases) * 40) : 40;
 
-  const criticalCases = shift.cases.filter((c) => c.acuity === 'critical' || c.acuity === 'unstable');
+  // Safety warnings are the high-risk items. One counts as handled once the incoming staff member has acknowledged it.
+  const criticalCases = shift.cases.filter(hasSafetyWarning);
   const criticalAlertsTotal = criticalCases.length;
-  const criticalAlertsAcknowledged = criticalCases.filter(
-    (c) => c.recommendation?.trim().length > 0 || Boolean(c.isolationOrHazardAlert)
-  ).length;
+  const criticalAlertsAcknowledged = criticalCases.filter((c) => Boolean(c.acknowledgedAt)).length;
   const safetyAck = criticalAlertsTotal > 0 ? Math.round((criticalAlertsAcknowledged / criticalAlertsTotal) * 35) : 35;
 
   const equipmentTotal = shift.equipment.length;

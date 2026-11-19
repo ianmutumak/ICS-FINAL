@@ -56,11 +56,11 @@ class DurationTally {
   summary(): StatisticsSnapshot['transition'] {
     return {
       measured: this.count,
-      averageMinutes: this.count ? Math.round(this.total / this.count) : null,
+      averageMinutes: this.count ? Math.round((this.total / this.count) * 10) / 10 : null,
       withinTarget: this.withinTarget,
       targetMinutes: TRANSITION_TARGET_MINUTES,
       averageByShift: Object.fromEntries(
-        Object.entries(this.byShift).map(([shift, { total, count }]) => [shift, Math.round(total / count)])
+        Object.entries(this.byShift).map(([shift, { total, count }]) => [shift, Math.round((total / count) * 10) / 10])
       ),
     };
   }

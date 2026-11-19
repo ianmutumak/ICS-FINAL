@@ -13,6 +13,7 @@ export const STORAGE_KEYS = {
   overrides: 'zamu_overrides_v7',
   categories: 'zamu_categories_v7',
   susEvaluations: 'zamu_sus_evaluations_v7',
+  forecastReview: 'zamu_forecast_review_v7',
 } as const;
 
 // One-time housekeeping: drop caches from older versions, and never keep a signed-in
