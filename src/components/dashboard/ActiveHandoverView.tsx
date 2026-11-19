@@ -135,18 +135,15 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
 
   const { details } = heiScore;
 
-  const addEquipment = (event: React.FormEvent) => {
+  const addEquipment = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!equipmentName.trim()) return;
-    addEquipmentItem({
-      name: equipmentName.trim(),
-      assetTag: equipmentTag.trim(),
-      location: activeHandover.wardOrDepartment,
-      status: equipmentStatus,
-    });
-    setEquipmentName('');
-    setEquipmentTag('');
-    setEquipmentStatus('functional');
+    const saved = await addEquipmentItem({ name: equipmentName.trim(), assetTag: equipmentTag.trim(), status: equipmentStatus });
+    if (saved) {
+      setEquipmentName('');
+      setEquipmentTag('');
+      setEquipmentStatus('functional');
+    }
   };
 
   return (
@@ -269,7 +266,7 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
                     {item.lastUpdated}{item.updatedBy ? ` · ${item.updatedBy}` : ''}
                   </p>
                 </div>
-                {!isLocked && (
+                {!isLocked && (currentUser.isAdmin || item.authorId === currentUser.id) && (
                   <button onClick={() => deleteCase(item.id)} aria-label={`Remove update ${item.subjectRef}`} className="no-print rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40">
                     <Trash2 className="h-4 w-4" />
                   </button>

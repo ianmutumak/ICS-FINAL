@@ -20,8 +20,6 @@ export interface UserStaff {
   department: string;
   qualification: string;
   avatarSeed: string;
-  pin?: string;
-  email?: string;
   isAdmin?: boolean;
   status?: 'active' | 'on_leave' | 'suspended';
 }
@@ -61,6 +59,8 @@ export interface SbarCase {
   }[];
   lastUpdated: string;
   updatedBy: string;
+  /** The account that wrote the update. Only that account, or an administrator, can remove it. */
+  authorId?: string;
   /** Set when the incoming staff member has acknowledged this update's safety warning. */
   acknowledgedBy?: string;
   acknowledgedById?: string;
@@ -159,7 +159,7 @@ export interface AdminOverrideLog {
   departmentName: string;
   adminName: string;
   adminId: string;
-  actionType: 'emergency_signoff' | 'reopen_shift' | 'dispute_resolution' | 'reassign_leads';
+  actionType: 'emergency_signoff' | 'cancel_shift' | 'reopen_shift' | 'dispute_resolution' | 'reassign_leads';
   reason: string;
   timestamp: string;
 }

@@ -1,0 +1,34 @@
+# Render blueprint: one web service that serves the built app and the API.
+# In Render choose New > Blueprint and point it at this repository. The values marked sync: false
+# are asked for once and are never stored in the repository.
+services:
+  - type: web
+    name: zamu-check
+    runtime: node
+    plan: free
+    # The build needs the development packages (the Tailwind compiler), so they are installed explicitly.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: zamucheck
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: INITIAL_ADMIN_BADGE
+        sync: false
+      - key: INITIAL_ADMIN_NAME
+        value: Administrator
+      - key: INITIAL_ADMIN_PIN
+        sync: false
+      - key: ALLOW_SELF_REGISTRATION
+        value: false
+      - key: APP_TIMEZONE
+        value: Africa/Nairobi

@@ -17,8 +17,8 @@ University.
   member signs with a different account. The incoming staff member must
   acknowledge every safety warning before they can sign. Updates and equipment
   cannot change once the outgoing staff member has signed.
-- **Seal:** each signed handover gets a SHA-256 seal; a record that changes after
-  signing is reported.
+- **Seal:** each signed handover gets a SHA-256 seal, computed by the server; a record
+  that changes after signing is reported.
 - **Approve:** an administrator approves the signed handover. It is archived and
   the next shift opens with open items carried over; safety warnings must be
   acknowledged again.
@@ -34,24 +34,48 @@ University.
 
 ## Tech stack
 
-- React 19, TypeScript, Vite and Tailwind CSS 4
-- Firebase Firestore for shared records, with a browser-storage cache
-- Python (pandas, scikit-learn) for the workload forecast
-- Node.js and Express to serve the built app
+- React 19, TypeScript, Vite and Tailwind CSS 4 for the browser app
+- Node.js and Express for the API, which enforces every rule and role
+- MongoDB (MongoDB Atlas when deployed) for all records
+- Python (pandas, scikit-learn, statsmodels) for the workload forecast
+
+The browser never talks to the database. It signs in through the API and receives a
+session cookie that scripts on the page cannot read. PINs are kept only as salted
+scrypt hashes.
 
 ## Getting started
 
-Requires Node.js 20 or later.
+Requires Node.js 20.12 or later.
 
 ```bash
 npm install
 ```
 
+To try the app with a MongoDB that runs on this computer, with no account needed:
+
 ```bash
 npm run dev
 ```
 
-The app runs at http://localhost:3000.
+The first run downloads a MongoDB program (about 100 MB). The terminal prints the
+address to open (usually http://localhost:3000, or the next free port) and a
+development administrator badge ID and PIN. Data is kept in `.devdata/`.
+
+To use your own MongoDB, such as Atlas, copy `.env.example` to `.env`, fill it in,
+and run:
+
+```bash
+npm run dev:atlas
+```
+
+Settings (all in `.env`, never committed):
+
+| Setting | Purpose |
+|---|---|
+| `MONGODB_URI` | MongoDB connection string |
+| `SESSION_SECRET` | At least 32 random characters; signs session cookies |
+| `INITIAL_ADMIN_BADGE`, `INITIAL_ADMIN_PIN` | Creates the first administrator when the database has none. Remove the PIN afterwards |
+| `ALLOW_SELF_REGISTRATION` | `false` by default: administrators create accounts |
 
 ## Statistics and demo data
 
@@ -187,73 +211,89 @@ can be retrained on them.
 
 | Script | What it does |
 |---|---|
-| `npm run dev` | Starts the Vite dev server |
-| `npm run build` | Builds the client into `dist/` |
-| `npm start` | Serves the built client; `/healthz` reports whether a build is present |
+| `npm run dev` | API and app together, on a local MongoDB |
+| `npm run dev:atlas` | API and app together, on the MongoDB in `.env` |
+| `npm run build` | Builds the app into `dist/` |
+| `npm start` | Runs the API and serves the built app (what a host runs) |
+| `npm test` | Runs the unit tests and the server tests (these start a throwaway MongoDB) |
 | `npm run lint` | Type-checks the project |
-| `npm test` | Runs the automated unit tests |
-| `npm run clean` | Removes `dist/` |
+| `npm run backup` | Saves the whole database to `backups/` |
+| `npm run restore -- <file>` | Restores a backup into an empty database (`--replace` to overwrite) |
 
 ## Project structure
 
 ```
-server.js                  Express server that hosts the built app, with a /healthz check
-firebase.json              Firebase Hosting and Firestore configuration
-firestore.rules            Firestore security rules
+server/                    The API (Express and MongoDB)
+  app.js                   Security headers, origin check, routes, static hosting
+  auth.js                  PIN hashing, sessions, roles, sign-in limiter
+  rules.js                 The handover rules and the SHA-256 seal
+  routes/                  auth, users, shifts, and the other records
+  backup.js                Database export and import
+  *.test.js                Server tests against a real MongoDB
+scripts/                   dev launcher, backup and restore
+render.yaml                Deployment blueprint for Render
 ml/                        Synthetic data generator and forecast model (Python)
 src/
   App.tsx                  Screen routing
   components/
-    auth/                  Sign-in and registration
+    auth/                  Sign-in
     dashboard/             The handover screen
-    modals/                Start shift, add update, review and sign
-    admin/                 Admin console and audit trail
+    modals/                Start shift, add update, review and sign, change PIN
+    admin/                 Admin console: users, audit trail, timing study
     analytics/             Statistics, charts, forecast
     layout/, common/       Header and icons
-  context/
-    HandoverContext.tsx    Combines the modules below into one provider
-    useAuth.ts             Staff accounts and the current session
-    useFacility.ts         Zones, categories and incidents
-    useShift.ts            Open handover, tasks, signatures, approval, archive
-    useForecastReview.ts   Administrator decisions about forecast warnings
-    storage.ts             Browser storage keys and helpers
-  lib/
-    shiftRules.ts          Shift windows, SHA-256 seal, effectiveness index, overdue alerts
-    auditTrail.ts          Builds the audit trail from handovers, overrides and decisions
-    firebase.ts            Firebase set-up
-    firestoreService.ts    Reading and writing Firestore records
-    statisticsSnapshot.ts  Aggregate figures for the Statistics screen
-    forecast.ts            Types and loader for the exported forecast
-  data/
-    seedData.ts            Starting data
-    demoData.json          Demo statistics and forecast, written by ml/
+  context/                 Auth, shift, facility and forecast-review hooks
+  lib/                     API client, shift rules, audit trail, timing study, statistics
+  data/                    Demo statistics and forecast, written by ml/
   types/                   Shared types
 ```
 
-Automated tests sit beside the code they test (`*.test.ts`). The helpers they
-share are in `src/lib/testHelpers.ts`.
+Automated tests sit beside the code they test (`*.test.ts`, `*.test.js`).
 
-## Hosting
+## Deployment
 
-The application is a browser client that talks to Firestore, so Firebase Hosting
-is the natural home for it: `npm run build`, then `firebase deploy --only hosting`
-(configuration in `firebase.json`). Do not deploy with the open database rules.
+The app runs as one Node service with MongoDB Atlas behind it:
+
+1. Create an Atlas cluster (the free M0 tier is enough), a database user, and a
+   network rule. Copy the connection string.
+2. In Render choose New, then Blueprint, and select this repository. `render.yaml`
+   sets everything except the values you are asked for: the connection string and the
+   first administrator's badge ID and PIN.
+3. When the service is live, open `/healthz`; it reports whether the database is
+   reachable. Sign in as the administrator, create staff accounts, then remove
+   `INITIAL_ADMIN_PIN` from the service's environment.
+4. Take a backup with `npm run backup` (Atlas's free tier has no automatic backups)
+   and keep the file private, because it contains PIN hashes.
+
+## Security model
+
+- Every action is checked on the server: who may sign, in what order, which
+  warnings must be acknowledged, what is locked, and who may approve. The browser
+  only displays what is allowed.
+- PINs are stored as salted scrypt hashes; failed sign-ins are limited per badge
+  and per address.
+- The session cookie is `HttpOnly`, `SameSite=Lax` and `Secure` in production.
+- Each tab tells the server which account it is showing. If another account has
+  signed in on the same browser, the old tab is signed out instead of acting as
+  the wrong person.
+- Requests from another website are refused; in production the page is served with a
+  strict content security policy.
 
 ## Prototype limitations
 
 This is an academic prototype. Do not use it with real operational or personal
 data until these are addressed:
 
-- Each signed handover carries a SHA-256 seal of its updates, signers and signing
-  times, computed in the browser. It shows whether a record changed after signing,
-  but it is not tamper-proof against someone who can edit the database.
-- Writes made while offline are queued by the Firestore local cache and sent when
-  the connection returns; conflicts are resolved as last write wins.
-- Sign-in is checked in the browser only, with PINs kept in browser storage. It
-  is a demonstration login, not real authentication. The locks on signed handovers
-  and the acknowledgement rule are enforced by the application, not by the
-  database.
-- `firestore.rules` currently allows public read and write.
-- Staff accounts are stored per browser and are not shared between devices.
+- A PIN of 4 to 6 digits is easy to guess if someone obtains the database and
+  hashes; the sign-in limiter protects only against guessing through the app.
+  Longer passphrases or a second factor would be needed in real use.
+- The sign-in limiter and session secret are per server process. Running several
+  servers would need a shared store for the limiter.
+- A signed handover's SHA-256 seal shows whether the record changed, but someone
+  who can edit the database can edit the seal too.
+- Forecast decisions, timing runs and the audit trail are stored on the server,
+  but the audit trail is derived from the records and not an independent log.
+- Accounts are not tied to a department, so any signed-in staff member can see and
+  add updates to the open shift.
 - The forecast is trained on synthetic data and has not been validated against
   real records.

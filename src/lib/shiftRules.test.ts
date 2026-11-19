@@ -7,10 +7,9 @@ import {
   localDateString,
   minutesBetween,
   sealHandover,
-  toPublicStaff,
   unacknowledgedWarnings,
 } from './shiftRules';
-import { makeCase, makeShift, makeSignedShift, staff } from './testHelpers';
+import { makeCase, makeShift, makeSignedShift } from './testHelpers';
 
 describe('minutesBetween', () => {
   it('records to a tenth of a minute', () => {
@@ -30,12 +29,6 @@ describe('localDateString', () => {
   it('formats as YYYY-MM-DD in the local time zone', () => {
     expect(localDateString(new Date(2026, 10, 17, 23, 30))).toBe('2026-11-17');
     expect(localDateString(new Date(2026, 0, 2, 0, 5))).toBe('2026-01-02');
-  });
-});
-
-describe('toPublicStaff', () => {
-  it('never carries the PIN into shared records', () => {
-    expect(toPublicStaff(staff('usr-1', 'David'))).not.toHaveProperty('pin');
   });
 });
 
