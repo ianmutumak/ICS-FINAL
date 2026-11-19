@@ -8,7 +8,7 @@ interface NewCaseModalProps {
 }
 
 export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) => {
-  const { addCase, currentUser } = useHandover();
+  const { addCase } = useHandover();
   const [subjectRef, setSubjectRef] = useState('');
   const [situation, setSituation] = useState('');
   const [background, setBackground] = useState('');
@@ -23,16 +23,18 @@ export const NewCaseModal: React.FC<NewCaseModalProps> = ({ isOpen, onClose }) =
     setRecommendation(''); setHazardAlert('');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addCase({
-      subjectRef: subjectRef.trim(), category: 'General update', acuity: 'stable',
+    const saved = await addCase({
+      subjectRef: subjectRef.trim(),
       situation: situation.trim(), background: background.trim(), assessment: assessment.trim(),
       recommendation: recommendation.trim(), isolationOrHazardAlert: hazardAlert.trim() || undefined,
-      updatedBy: currentUser.name,
     });
-    resetForm();
-    onClose();
+    // The form stays open if the server refused the update, so nothing typed is lost.
+    if (saved) {
+      resetForm();
+      onClose();
+    }
   };
 
   const inputClass = 'mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-base text-slate-900 placeholder:text-slate-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-600/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white';

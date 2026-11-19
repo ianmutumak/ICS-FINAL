@@ -1,7 +1,7 @@
 import type { HandoverRecord, SbarCase, UserStaff } from '../types';
 
 export const staff = (id: string, name: string): UserStaff => ({
-  id, staffNumber: id.toUpperCase(), name, role: 'Staff member', department: '', qualification: '', avatarSeed: name[0], pin: '1234',
+  id, staffNumber: id.toUpperCase(), name, role: 'Staff member', department: '', qualification: '', avatarSeed: name[0],
 });
 
 export const makeCase = (overrides: Partial<SbarCase> = {}): SbarCase => ({

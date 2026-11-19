@@ -1,182 +1,124 @@
-import { useState } from 'react';
-import { UserStaff } from '../types';
-import { SEED_STAFF } from '../data/seedData';
-import { STORAGE_KEYS, readStored, usePersistedState } from './storage';
+import { useCallback, useEffect, useState } from 'react';
+import type { UserStaff } from '../types';
+import { api, errorMessage, setExpectedUser, setUnauthorizedHandler } from '../lib/api';
 
-export const MASTER_ADMIN_PASSKEY = 'ZAMU-ADMIN-2026';
+type AuthResult = { success: boolean; error?: string };
 
-const initialsOf = (name: string) =>
-  name.split(' ').filter(Boolean).map((part) => part[0]).join('').substring(0, 2).toUpperCase() || '?';
-
-type AuthResult ={ success: boolean; user?: UserStaff; error?: string };
+/** Shown by screens that read the user before anyone has signed in. Never treated as a real account. */
+export const SIGNED_OUT_USER: UserStaff = {
+  id: '', staffNumber: '', name: '', role: '', department: '', qualification: '', avatarSeed: '', isAdmin: false,
+};
 
 /**
- * Staff accounts and the current session.
- * This is a client-side demonstration login, not real authentication (see the README).
+ * The signed-in user. Accounts, PINs and roles live on the server: the browser only holds a session cookie it
+ * cannot read, and asks the server who it is.
  */
 export function useAuth(onSignedIn: (isAdmin: boolean) => void, onSignedOut: () => void) {
-  const [staffList, setStaffList] = usePersistedState<UserStaff[]>(
-    STORAGE_KEYS.staffList,
-    () => readStored<UserStaff[]>(STORAGE_KEYS.staffList) ?? SEED_STAFF
-  );
-  const [currentUser, setCurrentUser] = usePersistedState<UserStaff>(
-    STORAGE_KEYS.currentUser,
-    () => readStored<UserStaff>(STORAGE_KEYS.currentUser) ?? SEED_STAFF[0]
-  );
+  const [currentUser, setCurrentUser] = useState<UserStaff | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [selfRegistration, setSelfRegistration] = useState(false);
+  // Shown on the sign-in screen when the server ended the session, for example because another account signed in here.
+  const [sessionNotice, setSessionNotice] = useState('');
 
-  // A session never survives a reload: these two are deliberately not persisted.
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [hasAdminClearance, setHasAdminClearance] = useState(false);
-
-  const startSession = (user: UserStaff, isAdmin: boolean) => {
-    setCurrentUser({ ...user, isAdmin });
-    setIsAuthenticated(true);
-    setHasAdminClearance(isAdmin);
-    onSignedIn(isAdmin);
-  };
-
-  const signInUser = (staffNumber: string, pin: string, adminPasskey?: string): AuthResult => {
-    const user = staffList.find((s) => s.staffNumber.trim().toLowerCase() === staffNumber.trim().toLowerCase());
-    if (!user) {
-      return { success: false, error: 'Staff ID not found in institutional roster.' };
-    }
-    if (user.pin && user.pin !== pin) {
-      return { success: false, error: 'Incorrect PIN provided for this staff account.' };
-    }
-    if (user.status === 'suspended') {
-      return { success: false, error: 'This account is suspended. Contact an administrator.' };
-    }
-    const passkeyMatches = Boolean(adminPasskey && adminPasskey.trim() === MASTER_ADMIN_PASSKEY);
-    startSession(user, Boolean(user.isAdmin) || passkeyMatches);
-    return { success: true };
-  };
-
-  const signUpUser = (userData: Omit<UserStaff, 'id' | 'avatarSeed'>, adminPasskey?: string): AuthResult => {
-    if (staffList.some((s) => s.staffNumber.trim().toLowerCase() === userData.staffNumber.trim().toLowerCase())) {
-      return { success: false, error: 'A worker with this Badge ID already exists in the roster.' };
-    }
-    const initials = userData.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase();
-    const isAdmin = Boolean(adminPasskey && adminPasskey.trim() === MASTER_ADMIN_PASSKEY);
-    const newUser: UserStaff = {
-      ...userData,
-      id: `usr-${Date.now().toString(36)}`,
-      avatarSeed: initials || 'RN',
-      status: 'active',
-      isAdmin,
+  // Restore an existing session, and learn whether people may register themselves.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [{ user }, config] = await Promise.all([
+          api<{ user: UserStaff | null }>('GET', '/auth/me'),
+          api<{ selfRegistration: boolean }>('GET', '/auth/config'),
+        ]);
+        if (cancelled) return;
+        setSelfRegistration(config.selfRegistration);
+        if (user) {
+          setCurrentUser(user);
+          onSignedIn(Boolean(user.isAdmin));
+        }
+      } catch {
+        // The server is unreachable; the sign-in screen is shown and reports the problem on sign-in.
+      } finally {
+        if (!cancelled) setAuthReady(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-    setStaffList((prev) => [newUser, ...prev]);
-    startSession(newUser, isAdmin);
-    return { success: true, user: newUser };
-  };
+    // Runs once on start-up.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const switchUser = (userId: string) => {
-    const target = staffList.find((s) => s.id === userId);
-    if (target) {
-      setCurrentUser(target);
-      setHasAdminClearance(Boolean(target.isAdmin));
+  // If the server ends the session (for example the account was suspended), return to the sign-in screen.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setCurrentUser((previous) => {
+        if (previous) setSessionNotice('You were signed out. Your session ended, or another account signed in on this browser.');
+        return null;
+      });
+      onSignedOut();
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [onSignedOut]);
+
+  // Tell the server which account this tab is acting as, and notice if the browser's session changes underneath it.
+  useEffect(() => {
+    setExpectedUser(currentUser?.id ?? '');
+  }, [currentUser]);
+
+  const signInUser = useCallback(async (staffNumber: string, pin: string): Promise<AuthResult> => {
+    try {
+      const { user } = await api<{ user: UserStaff }>('POST', '/auth/login', { staffNumber, pin });
+      setSessionNotice('');
+      setCurrentUser(user);
+      onSignedIn(Boolean(user.isAdmin));
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: errorMessage(error) };
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const signOutUser = () => {
-    setIsAuthenticated(false);
-    setHasAdminClearance(false);
+  const signUpUser = useCallback(async (details: { name: string; staffNumber: string; pin: string }): Promise<AuthResult> => {
+    try {
+      const { user } = await api<{ user: UserStaff }>('POST', '/auth/register', details);
+      setCurrentUser(user);
+      onSignedIn(false);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: errorMessage(error) };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const signOutUser = useCallback(async () => {
+    try {
+      await api('POST', '/auth/logout');
+    } catch {
+      // The cookie expires on its own; the screen still returns to sign-in.
+    }
+    setCurrentUser(null);
     onSignedOut();
-  };
+  }, [onSignedOut]);
 
-  // ---- User management (administrators) ----
-
-  const badgeTaken = (staffNumber: string, exceptId?: string) =>
-    staffList.some((s) => s.id !== exceptId && s.staffNumber.trim().toLowerCase() === staffNumber.trim().toLowerCase());
-
-  /** True if removing admin rights from, suspending or deleting this user would leave no working administrator. */
-  const isLastActiveAdmin = (userId: string) => {
-    const activeAdmins = staffList.filter((s) => s.isAdmin && s.status !== 'suspended');
-    return activeAdmins.length === 1 && activeAdmins[0].id === userId;
-  };
-
-  const addUser = (userData: Omit<UserStaff, 'id' | 'avatarSeed'>): AuthResult => {
-    if (!userData.name.trim() || !userData.staffNumber.trim()) {
-      return { success: false, error: 'Enter a name and a badge ID.' };
+  const changePin = useCallback(async (currentPin: string, newPin: string): Promise<AuthResult> => {
+    try {
+      await api('POST', '/auth/pin', { currentPin, newPin });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: errorMessage(error) };
     }
-    if (!userData.pin || !/^\d{4,6}$/.test(userData.pin)) {
-      return { success: false, error: 'The PIN must be 4 to 6 digits.' };
-    }
-    if (badgeTaken(userData.staffNumber)) {
-      return { success: false, error: 'Another user already has this badge ID.' };
-    }
-    const newUser: UserStaff = {
-      ...userData,
-      name: userData.name.trim(),
-      staffNumber: userData.staffNumber.trim().toUpperCase(),
-      id: `usr-${Date.now().toString(36)}`,
-      avatarSeed: initialsOf(userData.name),
-      status: userData.status ?? 'active',
-      isAdmin: Boolean(userData.isAdmin),
-    };
-    setStaffList((prev) => [newUser, ...prev]);
-    return { success: true, user: newUser };
-  };
-
-  const updateUser = (userId: string, changes: Partial<Omit<UserStaff, 'id' | 'avatarSeed'>>): AuthResult => {
-    const existing = staffList.find((s) => s.id === userId);
-    if (!existing) return { success: false, error: 'This user no longer exists.' };
-
-    const updated: UserStaff = { ...existing, ...changes };
-    updated.name = updated.name.trim();
-    updated.staffNumber = updated.staffNumber.trim().toUpperCase();
-    updated.avatarSeed = initialsOf(updated.name);
-    // An empty PIN field means "keep the current PIN".
-    if (!changes.pin) updated.pin = existing.pin;
-
-    if (!updated.name || !updated.staffNumber) return { success: false, error: 'Enter a name and a badge ID.' };
-    if (changes.pin && !/^\d{4,6}$/.test(changes.pin)) return { success: false, error: 'The PIN must be 4 to 6 digits.' };
-    if (badgeTaken(updated.staffNumber, userId)) return { success: false, error: 'Another user already has this badge ID.' };
-    if (isLastActiveAdmin(userId) && (!updated.isAdmin || updated.status === 'suspended')) {
-      return { success: false, error: 'This is the only active administrator. Make another user an administrator first.' };
-    }
-
-    setStaffList((prev) => prev.map((s) => (s.id === userId ? updated : s)));
-    if (currentUser.id === userId) {
-      setCurrentUser(updated);
-      setHasAdminClearance(Boolean(updated.isAdmin));
-    }
-    return { success: true, user: updated };
-  };
-
-  const deleteUser = (userId: string): AuthResult => {
-    if (userId === currentUser.id) return { success: false, error: 'You cannot delete the account you are signed in with.' };
-    if (isLastActiveAdmin(userId)) {
-      return { success: false, error: 'This is the only active administrator. Make another user an administrator first.' };
-    }
-    setStaffList((prev) => prev.filter((s) => s.id !== userId));
-    return { success: true };
-  };
-
-  const updateUserRole =(userId: string, newRole: string, isAdmin: boolean) => {
-    setStaffList((prev) => prev.map((s) => (s.id === userId ? { ...s, role: newRole, isAdmin } : s)));
-    if (currentUser.id === userId) {
-      setCurrentUser((prev) => ({ ...prev, role: newRole, isAdmin }));
-      setHasAdminClearance(isAdmin);
-    }
-  };
-
-  const updateUserStatus = (userId: string, status: 'active' | 'on_leave' | 'suspended') => {
-    setStaffList((prev) => prev.map((s) => (s.id === userId ? { ...s, status } : s)));
-  };
+  }, []);
 
   return {
-    staffList,
-    currentUser,
-    isAuthenticated,
-    hasAdminClearance,
+    currentUser: currentUser ?? SIGNED_OUT_USER,
+    isAuthenticated: currentUser !== null,
+    hasAdminClearance: Boolean(currentUser?.isAdmin),
+    authReady,
+    selfRegistration,
+    sessionNotice,
     signInUser,
     signUpUser,
-    switchUser,
     signOutUser,
-    addUser,
-    updateUser,
-    deleteUser,
-    updateUserRole,
-    updateUserStatus,
+    changePin,
   };
 }

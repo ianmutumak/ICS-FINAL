@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { AuditTrailView } from './AuditTrailView';
+import { TimingStudyView } from './TimingStudyView';
+import { UserManagement } from './UserManagement';
 import { useHandover } from '../../context/HandoverContext';
 import {
   ShieldAlert,
@@ -29,9 +31,6 @@ import {
 export const AdminConsoleView: React.FC = () => {
   const {
     currentUser,
-    staffList,
-    updateUserRole,
-    updateUserStatus,
     activeHandover,
     archive,
     overrideShiftSignoff,
@@ -41,7 +40,7 @@ export const AdminConsoleView: React.FC = () => {
     overrideLogs,
     departments,
     addDepartment,
-    updateDepartment,
+    cancelShift,
     deleteDepartment,
     categories,
     addCategory,
@@ -50,11 +49,15 @@ export const AdminConsoleView: React.FC = () => {
     setActiveTab,
   } = useHandover();
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'shifts' | 'incidents' | 'tasks' | 'overrides' | 'zones' | 'audit'>('users');
+  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'shifts' | 'incidents' | 'tasks' | 'overrides' | 'zones' | 'audit' | 'timing'>('users');
 
   // Override dialog state
   const [selectedShiftToOverride, setSelectedShiftToOverride] = useState<string | null>(null);
   const [overrideReason, setOverrideReason] = useState('');
+
+  // Cancel-shift dialog state
+  const [selectedShiftToCancel, setSelectedShiftToCancel] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   // Incident resolution modal state
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
@@ -64,7 +67,7 @@ export const AdminConsoleView: React.FC = () => {
   // New incident report form state
   const [showNewIncidentForm, setShowNewIncidentForm] = useState(false);
   const [newIncTitle, setNewIncTitle] = useState('');
-  const [newIncDeptId, setNewIncDeptId] = useState(departments[0]?.id || 'dept-imp');
+  const [newIncDeptId, setNewIncDeptId] = useState(departments[0]?.id || '');
   const [newIncSeverity, setNewIncSeverity] = useState<'critical' | 'major' | 'moderate' | 'minor'>('major');
 
   // Dynamic Department / Zone form state
@@ -83,41 +86,40 @@ export const AdminConsoleView: React.FC = () => {
   const allShifts = [activeHandover, ...archive].filter((shift) => shift.handoverCode);
   const describeLead = (lead: { name: string; role: string }) => (lead.role ? `${lead.name} (${lead.role})` : lead.name);
 
-  const handleExecuteOverride = (e: React.FormEvent) => {
+  const handleExecuteOverride = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedShiftToOverride || !overrideReason.trim()) return;
-    overrideShiftSignoff(selectedShiftToOverride, overrideReason.trim());
-    setSelectedShiftToOverride(null);
+    if (await overrideShiftSignoff(selectedShiftToOverride, overrideReason.trim())) setSelectedShiftToOverride(null);
   };
 
-  const handleExecuteResolveIncident = (e: React.FormEvent) => {
+  const handleExecuteResolveIncident = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedIncidentId || !resolutionNotes.trim()) return;
-    resolveIncident(selectedIncidentId, resolutionNotes.trim(), rootCause.trim());
-    setSelectedIncidentId(null);
-    setResolutionNotes('');
+    if (await resolveIncident(selectedIncidentId, resolutionNotes.trim(), rootCause.trim())) {
+      setSelectedIncidentId(null);
+      setResolutionNotes('');
+    }
   };
 
-  const handleCreateIncident = (e: React.FormEvent) => {
+  const handleCreateIncident = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newIncTitle.trim()) return;
-    const dept = departments.find((d) => d.id === newIncDeptId);
-    reportIncident({
+    const saved = await reportIncident({
       title: newIncTitle.trim(),
       departmentId: newIncDeptId,
-      departmentName: dept?.name || 'Operational Zone',
       severity: newIncSeverity,
-      reportedBy: currentUser.name,
       mitigationNotes: 'Reported via Administrative Safety Console.',
     });
-    setNewIncTitle('');
-    setShowNewIncidentForm(false);
+    if (saved) {
+      setNewIncTitle('');
+      setShowNewIncidentForm(false);
+    }
   };
 
-  const handleCreateDepartment = (e: React.FormEvent) => {
+  const handleCreateDepartment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deptCode.trim() || !deptName.trim()) return;
-    addDepartment({
+    const saved = await addDepartment({
       code: deptCode.trim().toUpperCase(),
       name: deptName.trim(),
       building: deptBuilding.trim(),
@@ -125,9 +127,11 @@ export const AdminConsoleView: React.FC = () => {
       capacity: Number(deptCapacity) || 500,
       headOfDepartment: deptSupervisor.trim(),
     });
-    setDeptCode('');
-    setDeptName('');
-    setShowNewDeptModal(false);
+    if (saved) {
+      setDeptCode('');
+      setDeptName('');
+      setShowNewDeptModal(false);
+    }
   };
 
 
@@ -180,7 +184,7 @@ export const AdminConsoleView: React.FC = () => {
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            Users ({staffList.length})
+            Users
           </button>
           <button
             onClick={() => setActiveAdminTab('zones')}
@@ -243,109 +247,20 @@ export const AdminConsoleView: React.FC = () => {
           >
             Audit Trail
           </button>
+          <button
+            onClick={() => setActiveAdminTab('timing')}
+            className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap ${
+              activeAdminTab === 'timing'
+                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+            }`}
+          >
+            Timing Study
+          </button>
         </div>
       </section>
 
-      {/* Tab 1: User & Role Management */}
-      {activeAdminTab === 'users' && (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Warehouse & Operations Workforce Directory
-              </h3>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                Configure role elevations, administrative privileges, and duty status
-              </span>
-            </div>
-            <span className="text-xs font-mono text-teal-700 dark:text-teal-400">
-              {staffList.filter((s) => s.isAdmin).length} Super Admins
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-mono text-[11px] bg-slate-50/50 dark:bg-slate-800/40">
-                  <th className="py-2.5 px-4 font-semibold">Worker / Operator Name</th>
-                  <th className="py-2.5 px-4 font-semibold">Staff Number</th>
-                  <th className="py-2.5 px-4 font-semibold">Department</th>
-                  <th className="py-2.5 px-4 font-semibold">Role Title</th>
-                  <th className="py-2.5 px-4 font-semibold">Privilege Level</th>
-                  <th className="py-2.5 px-4 font-semibold">Account Status</th>
-                  <th className="py-2.5 px-4 text-right font-semibold">Role Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {staffList.map((staff) => (
-                  <tr key={staff.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                    <td className="py-2.5 px-4">
-                      <div className="font-semibold text-slate-900 dark:text-white">
-                        {staff.name}
-                      </div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        {staff.qualification}
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-4 font-mono text-slate-600 dark:text-slate-400">
-                      {staff.staffNumber}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300">
-                      {staff.department}
-                    </td>
-                    <td className="py-2.5 px-4 font-medium text-slate-800 dark:text-slate-200">
-                      {staff.role}
-                    </td>
-                    <td className="py-2.5 px-4">
-                      {staff.isAdmin ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded font-bold">
-                          <Lock className="w-3 h-3" /> System Admin
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
-                          Standard Staff
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-4">
-                      <span
-                        className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded ${
-                          staff.status === 'suspended'
-                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                            : staff.status === 'on_leave'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
-                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                        }`}
-                      >
-                        {staff.status || 'active'}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => updateUserRole(staff.id, staff.role, !staff.isAdmin)}
-                          className="px-2 py-1 text-[11px] font-semibold rounded text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                        >
-                          {staff.isAdmin ? 'Revoke Admin' : 'Make Admin'}
-                        </button>
-                        <select
-                          value={staff.status || 'active'}
-                          onChange={(e) => updateUserStatus(staff.id, e.target.value as any)}
-                          className="px-1.5 py-0.5 text-[10px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-slate-700 dark:text-slate-300"
-                        >
-                          <option value="active">Active</option>
-                          <option value="on_leave">Leave</option>
-                          <option value="suspended">Suspend</option>
-                        </select>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {activeAdminTab === 'users' && <UserManagement />}
 
       {/* Tab: Facility Zones & Classifications Management */}
       {activeAdminTab === 'zones' && (
@@ -558,6 +473,14 @@ export const AdminConsoleView: React.FC = () => {
                       </span>
                     ) : (
                       <span className="text-xs text-slate-500 dark:text-slate-400">Awaiting staff signatures</span>
+                    )}
+                    {!isSealed && (
+                      <button
+                        onClick={() => { setSelectedShiftToCancel(shift.id); setCancelReason(''); }}
+                        className="px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg cursor-pointer"
+                      >
+                        Cancel shift
+                      </button>
                     )}
                   </div>
                 </div>
@@ -786,6 +709,7 @@ export const AdminConsoleView: React.FC = () => {
       )}
 
       {activeAdminTab === 'audit' && <AuditTrailView />}
+      {activeAdminTab === 'timing' && <TimingStudyView />}
 
       {/* Tab 5: Override Audit Ledger */}
       {activeAdminTab === 'overrides' && (
@@ -849,6 +773,40 @@ export const AdminConsoleView: React.FC = () => {
       )}
 
       {/* Override Dialog Modal */}
+      {selectedShiftToCancel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div role="dialog" aria-modal="true" aria-labelledby="cancel-shift-title" className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">
+            <h3 id="cancel-shift-title" className="text-sm font-bold text-slate-900 dark:text-white">Cancel this shift</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-400">
+              Use this for a shift that cannot be signed, for example one started by mistake. The shift is closed without a handover, and your reason is recorded in the override ledger.
+            </p>
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault();
+                if (!cancelReason.trim()) return;
+                if (await cancelShift(selectedShiftToCancel, cancelReason.trim())) setSelectedShiftToCancel(null);
+              }}
+              className="space-y-3 text-xs"
+            >
+              <label className="block font-semibold text-slate-700 dark:text-slate-300">
+                Reason *
+                <textarea
+                  rows={3}
+                  required
+                  value={cancelReason}
+                  onChange={(event) => setCancelReason(event.target.value)}
+                  className="mt-1 w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg font-normal text-slate-900 dark:text-slate-100"
+                />
+              </label>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <button type="button" onClick={() => setSelectedShiftToCancel(null)} className="px-3 py-1.5 text-slate-500 cursor-pointer">Keep the shift</button>
+                <button type="submit" className="px-4 py-1.5 font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg cursor-pointer">Cancel the shift</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {selectedShiftToOverride && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl p-6 space-y-4">

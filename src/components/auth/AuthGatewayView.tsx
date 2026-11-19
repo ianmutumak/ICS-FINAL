@@ -10,7 +10,7 @@ const HANDOVER_STEPS = [
 ];
 
 export const AuthGatewayView: React.FC = () => {
-  const { signInUser, signUpUser } = useHandover();
+  const { signInUser, signUpUser, selfRegistration, sessionNotice } = useHandover();
 
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [errorMessage, setErrorMessage] = useState('');
@@ -29,7 +29,7 @@ export const AuthGatewayView: React.FC = () => {
     setErrorMessage('');
   };
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     if (staffNumberInput.trim().length === 0) {
@@ -40,13 +40,13 @@ export const AuthGatewayView: React.FC = () => {
       setErrorMessage('Your PIN has at least 4 digits.');
       return;
     }
-    const res = signInUser(staffNumberInput.trim(), pinInput.trim());
+    const res = await signInUser(staffNumberInput.trim(), pinInput.trim());
     if (!res.success) {
       setErrorMessage(res.error || 'We could not sign you in. Check your badge ID and PIN.');
     }
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     if (!fullName.trim() || !newStaffNumber.trim()) {
@@ -62,12 +62,9 @@ export const AuthGatewayView: React.FC = () => {
       return;
     }
 
-    const res = signUpUser({
+    const res = await signUpUser({
       name: fullName.trim(),
       staffNumber: newStaffNumber.trim().toUpperCase(),
-      department: '',
-      role: 'Staff member',
-      qualification: '',
       pin: newPin.trim(),
     });
     if (!res.success) {
@@ -125,10 +122,10 @@ export const AuthGatewayView: React.FC = () => {
             {authMode === 'signin' ? 'Sign in to your shift' : 'Create your account'}
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {authMode === 'signin' ? 'Use the badge ID and PIN you registered with.' : 'You will sign handovers with this account.'}
+            {authMode === 'signin' ? selfRegistration ? 'Use the badge ID and PIN you registered with.' : 'Use your badge ID and PIN. Accounts are created by an administrator.' : 'You will sign handovers with this account.'}
           </p>
 
-          <div role="tablist" aria-label="Account" className="mt-6 grid grid-cols-2 gap-1 rounded-xl bg-slate-200/70 p-1 text-sm">
+          <div role="tablist" aria-label="Account" className={`mt-6 grid-cols-2 gap-1 rounded-xl bg-slate-200/70 p-1 text-sm ${selfRegistration ? 'grid' : 'hidden'}`}>
             {([['signin', 'Sign in'], ['signup', 'Register']] as const).map(([mode, label]) => (
               <button
                 key={mode}
@@ -144,6 +141,10 @@ export const AuthGatewayView: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {sessionNotice && !errorMessage && (
+            <div role="status" className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3 text-sm text-amber-950">{sessionNotice}</div>
+          )}
 
           {errorMessage && (
             <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-sm text-rose-800">

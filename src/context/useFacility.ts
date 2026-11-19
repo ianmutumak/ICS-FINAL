@@ -1,136 +1,106 @@
-import { useState } from 'react';
-import { DepartmentUnit, IncidentRecord, ShiftType, UserStaff } from '../types';
-import { SEED_CATEGORIES, SEED_DEPARTMENTS, SEED_INCIDENTS } from '../data/seedData';
-import {
-  deleteDepartmentFromFirestore,
-  saveDepartmentToFirestore,
-  saveIncidentToFirestore,
-} from '../lib/firestoreService';
-import { formatTime, toPublicStaff } from '../lib/shiftRules';
-import { STORAGE_KEYS, readStored, usePersistedState } from './storage';
+import { useCallback, useEffect, useState } from 'react';
+import type { DepartmentUnit, IncidentRecord } from '../types';
+import { api, errorMessage } from '../lib/api';
 
-// Categories and a zone that earlier versions pre-filled; they are dropped from stored data.
-const RETIRED_DEFAULT_CATEGORIES = new Set([
-  'Inbound Staging & Receiving', 'MHE & Equipment Custody', 'Cold Storage & Temperature Vault',
-  'Customs & Bonded Freight', 'Hazardous & Dangerous Goods', 'Outbound Marshalling & Dispatch',
-  'Facility Safety & Environmental',
-]);
-const RETIRED_DEPARTMENT_ID = 'dept-imp';
+interface FacilityDependencies {
+  isAuthenticated: boolean;
+  hasAdminClearance: boolean;
+  reportError: (message: string | null) => void;
+}
 
 /** Facility set-up an administrator manages: zones, workstream categories and incidents. */
-export function useFacility(currentUser: UserStaff) {
-  const [departments, setDepartments] = usePersistedState<DepartmentUnit[]>(STORAGE_KEYS.departments, () => {
-    const stored = readStored<DepartmentUnit[]>(STORAGE_KEYS.departments);
-    return stored ? stored.filter((dept) => dept.id !== RETIRED_DEPARTMENT_ID) : SEED_DEPARTMENTS;
-  });
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+export function useFacility({ isAuthenticated, hasAdminClearance, reportError }: FacilityDependencies) {
+  const [departments, setDepartments] = useState<DepartmentUnit[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [incidents, setIncidents] = useState<IncidentRecord[]>([]);
 
-  const [categories, setCategories] = usePersistedState<string[]>(STORAGE_KEYS.categories, () => {
-    const stored = readStored<string[]>(STORAGE_KEYS.categories);
-    return stored ? stored.filter((category) => !RETIRED_DEFAULT_CATEGORIES.has(category)) : SEED_CATEGORIES;
-  });
-
-  const [incidents, setIncidents] = usePersistedState<IncidentRecord[]>(
-    STORAGE_KEYS.incidents,
-    () => readStored<IncidentRecord[]>(STORAGE_KEYS.incidents) ?? SEED_INCIDENTS
-  );
-
-  const addDepartment = (deptData: { code: string; name: string; building: string; floor: string; capacity: number; headOfDepartment: string }) => {
-    const capacity = Number(deptData.capacity) || 50;
-    const newDept: DepartmentUnit = {
-      id: `dept-${Date.now().toString(36)}`,
-      code: deptData.code.toUpperCase().trim(),
-      name: deptData.name.trim(),
-      building: deptData.building.trim(),
-      floor: deptData.floor.trim(),
-      capacity,
-      activeUnits: Math.round(capacity * 0.7),
-      headOfDepartment: deptData.headOfDepartment.trim(),
-      currentShift: 'morning',
-      shiftStatus: 'scheduled',
-      roster: { morning: [toPublicStaff(currentUser)], evening: [], night: [] },
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setDepartments([]);
+      setCategories([]);
+      setIncidents([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const zones = await api<DepartmentUnit[]>('GET', '/departments');
+        if (!cancelled) setDepartments(zones);
+        if (hasAdminClearance) {
+          const [names, reported] = await Promise.all([
+            api<string[]>('GET', '/categories'),
+            api<IncidentRecord[]>('GET', '/incidents'),
+          ]);
+          if (!cancelled) {
+            setCategories(names);
+            setIncidents(reported);
+          }
+        }
+      } catch (error) {
+        if (!cancelled) reportError(errorMessage(error));
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-    setDepartments((prev) => [...prev, newDept]);
-    saveDepartmentToFirestore(newDept);
-    return newDept;
-  };
+  }, [isAuthenticated, hasAdminClearance, reportError]);
 
-  const updateDepartment = (id: string, updatedFields: Partial<DepartmentUnit>) => {
-    const dept = departments.find((d) => d.id === id);
-    if (!dept) return;
-    const modified: DepartmentUnit = { ...dept, ...updatedFields };
-    setDepartments((prev) => prev.map((d) => (d.id === id ? modified : d)));
-    saveDepartmentToFirestore(modified);
-  };
+  /** Runs a request, shows any error, and tells the caller whether it worked. */
+  const act = useCallback(async (request: () => Promise<void>) => {
+    try {
+      await request();
+      reportError(null);
+      return true;
+    } catch (error) {
+      reportError(errorMessage(error));
+      return false;
+    }
+  }, [reportError]);
 
-  const deleteDepartment = (id: string) => {
-    const remaining = departments.filter((d) => d.id !== id);
-    setDepartments(remaining);
-    deleteDepartmentFromFirestore(id);
-    if (selectedDepartmentId === id && remaining.length > 0) setSelectedDepartmentId(remaining[0].id);
-  };
+  const addDepartment = (zone: { code: string; name: string; building: string; floor: string; capacity: number; headOfDepartment: string }) =>
+    act(async () => {
+      const created = await api<DepartmentUnit>('POST', '/departments', zone);
+      setDepartments((previous) => [...previous, created]);
+    });
 
-  const assignStaffToRoster = (deptId: string, shiftType: ShiftType, staff: UserStaff) => {
-    const dept = departments.find((d) => d.id === deptId);
-    if (!dept || dept.roster[shiftType].some((s) => s.id === staff.id)) return;
-    const updatedDept: DepartmentUnit = {
-      ...dept,
-      roster: { ...dept.roster, [shiftType]: [...dept.roster[shiftType], toPublicStaff(staff)] },
-    };
-    setDepartments((prev) => prev.map((d) => (d.id === deptId ? updatedDept : d)));
-    saveDepartmentToFirestore(updatedDept);
-  };
+  const deleteDepartment = (id: string) =>
+    act(async () => {
+      await api('DELETE', `/departments/${id}`);
+      setDepartments((previous) => previous.filter((zone) => zone.id !== id));
+    });
 
-  const addCategory = (category: string) => {
-    const trimmed = category.trim();
-    if (!trimmed) return;
-    setCategories((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
-  };
+  const addCategory = (name: string) =>
+    act(async () => {
+      await api('POST', '/categories', { name });
+      setCategories((previous) => (previous.includes(name.trim()) ? previous : [...previous, name.trim()].sort()));
+    });
 
-  const deleteCategory = (category: string) => {
-    setCategories((prev) => prev.filter((c) => c !== category));
-  };
+  const deleteCategory = (name: string) =>
+    act(async () => {
+      await api('DELETE', `/categories/${encodeURIComponent(name)}`);
+      setCategories((previous) => previous.filter((category) => category !== name));
+    });
 
-  const reportIncident = (incidentData: Omit<IncidentRecord, 'id' | 'reportedAt' | 'status'>) => {
-    const newIncident: IncidentRecord = {
-      ...incidentData,
-      id: `inc-${Date.now().toString(36)}`,
-      status: 'open',
-      reportedAt: formatTime(),
-    };
-    setIncidents((prev) => [newIncident, ...prev]);
-    saveIncidentToFirestore(newIncident);
-  };
+  const reportIncident = (incident: { title: string; departmentId: string; severity: IncidentRecord['severity']; mitigationNotes?: string }) =>
+    act(async () => {
+      const created = await api<IncidentRecord>('POST', '/incidents', incident);
+      setIncidents((previous) => [created, ...previous]);
+    });
 
-  const resolveIncident = (incidentId: string, notes: string, rootCause: string) => {
-    const incident = incidents.find((inc) => inc.id === incidentId);
-    if (!incident) return;
-    const resolved: IncidentRecord = {
-      ...incident,
-      status: 'resolved',
-      resolvedBy: currentUser.name,
-      resolvedAt: formatTime(),
-      mitigationNotes: notes,
-      rootCause,
-    };
-    setIncidents((prev) => prev.map((inc) => (inc.id === incidentId ? resolved : inc)));
-    saveIncidentToFirestore(resolved);
-  };
+  const resolveIncident = (id: string, notes: string, rootCause: string) =>
+    act(async () => {
+      const resolved = await api<IncidentRecord>('POST', `/incidents/${id}/resolve`, { notes, rootCause });
+      setIncidents((previous) => previous.map((incident) => (incident.id === id ? resolved : incident)));
+    });
 
   return {
     departments,
-    setDepartments,
-    selectedDepartmentId,
-    setSelectedDepartmentId,
     addDepartment,
-    updateDepartment,
     deleteDepartment,
-    assignStaffToRoster,
     categories,
     addCategory,
     deleteCategory,
     incidents,
-    setIncidents,
     reportIncident,
     resolveIncident,
   };

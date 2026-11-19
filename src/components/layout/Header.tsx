@@ -1,5 +1,6 @@
-import React from 'react';
-import { LogOut } from 'lucide-react';
+import React, { useState } from 'react';
+import { KeyRound, LogOut } from 'lucide-react';
+import { ChangePinModal } from '../modals/ChangePinModal';
 import { useHandover, NavigationTab } from '../../context/HandoverContext';
 import { ZamuLogoIcon } from '../common/CustomSvgIcons';
 
@@ -8,6 +9,7 @@ const initialsOf = (name: string) =>
 
 export const Header: React.FC = () => {
   const { currentUser, hasAdminClearance, activeTab, setActiveTab, signOutUser } = useHandover();
+  const [pinOpen, setPinOpen] = useState(false);
   const isAdmin = hasAdminClearance && Boolean(currentUser.isAdmin);
 
   const tabs: { id: NavigationTab; label: string }[] = [
@@ -17,6 +19,7 @@ export const Header: React.FC = () => {
   ];
 
   return (
+    <>
     <header className="no-print sticky top-0 z-30 border-b border-slate-200 bg-slate-50/90 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6 lg:px-8">
         <button onClick={() => setActiveTab('active-handover')} className="flex items-center gap-2.5 rounded-lg text-left">
@@ -53,9 +56,17 @@ export const Header: React.FC = () => {
               {isAdmin ? 'Administrator' : currentUser.role || 'Staff member'}
             </p>
           </div>
-          <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">
+          <span aria-hidden="true" className="hidden h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white sm:flex">
             {initialsOf(currentUser.name)}
           </span>
+          <button
+            onClick={() => setPinOpen(true)}
+            aria-label="Change PIN"
+            title="Change PIN"
+            className="inline-flex items-center rounded-lg px-2.5 py-2 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+          >
+            <KeyRound className="h-4 w-4" />
+          </button>
           <button
             onClick={signOutUser}
             aria-label="Sign out"
@@ -67,5 +78,7 @@ export const Header: React.FC = () => {
         </div>
       </div>
     </header>
+    {pinOpen && <ChangePinModal onClose={() => setPinOpen(false)} />}
+    </>
   );
 };

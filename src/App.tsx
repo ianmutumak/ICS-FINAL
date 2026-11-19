@@ -10,11 +10,16 @@ import { SignoffModal } from './components/modals/SignoffModal';
 import { NewShiftModal } from './components/modals/NewShiftModal';
 
 function AppContent() {
-  const { activeTab, isAuthenticated, hasAdminClearance, currentUser } = useHandover();
+  const { activeTab, isAuthenticated, hasAdminClearance, currentUser, authReady, notice, dismissNotice } = useHandover();
 
   const [isSignoffOpen, setIsSignoffOpen] = useState(false);
   const [isNewCaseOpen, setIsNewCaseOpen] = useState(false);
   const [isNewShiftOpen, setIsNewShiftOpen] = useState(false);
+
+  // While the server is asked whether a session already exists, show nothing that could flash the sign-in screen.
+  if (!authReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-500 dark:bg-slate-950">Loading…</div>;
+  }
 
   // Dedicated Full-Screen Authentication Gate
   if (!isAuthenticated) {
@@ -28,6 +33,12 @@ function AppContent() {
 
       {/* Main Viewport Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {notice && (
+          <div role="alert" className="no-print mb-5 flex items-start justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-base text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
+            <span>{notice}</span>
+            <button type="button" onClick={dismissNotice} className="shrink-0 text-sm font-semibold underline">Dismiss</button>
+          </div>
+        )}
         {activeTab === 'active-handover' && (
           <ActiveHandoverView
             onOpenNewCase={() => setIsNewCaseOpen(true)}

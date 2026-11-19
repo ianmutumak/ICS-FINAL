@@ -1,4 +1,4 @@
-import { HandoverEffectivenessIndex, HandoverRecord, SbarCase, ShiftType, UserStaff } from '../types';
+import { HandoverEffectivenessIndex, HandoverRecord, SbarCase, ShiftType } from '../types';
 
 export const SHIFT_WINDOWS: Record<ShiftType, string> = {
   morning: '07:00 - 15:30',
@@ -53,12 +53,6 @@ export async function sealHandover(shift: HandoverRecord): Promise<string | unde
 
 export const formatTime = (date: Date | string = new Date()) =>
   new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-/** Staff details that are safe to embed in shared records. The PIN stays in the staff list. */
-export function toPublicStaff(staff: UserStaff): UserStaff {
-  const { pin: _pin, ...publicFields } = staff;
-  return publicFields;
-}
 
 export const isClosedShift = (shift: HandoverRecord) => shift.status === 'completed' || shift.status === 'archived';
 
