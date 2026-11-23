@@ -89,7 +89,10 @@ export const AdminConsoleView: React.FC = () => {
   const handleExecuteOverride = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedShiftToOverride || !overrideReason.trim()) return;
-    if (await overrideShiftSignoff(selectedShiftToOverride, overrideReason.trim())) setSelectedShiftToOverride(null);
+    if (await overrideShiftSignoff(selectedShiftToOverride, overrideReason.trim())) {
+      setSelectedShiftToOverride(null);
+      setOverrideReason('');
+    }
   };
 
   const handleExecuteResolveIncident = async (e: React.FormEvent) => {
