@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   APPROVAL_OVERDUE_HOURS,
+  LATE_GRACE_MINUTES,
   UNSIGNED_OVERDUE_HOURS,
   calculateHEI,
   handoverAlert,
+  latenessAlerts,
+  latenessMessage,
   localDateString,
   minutesBetween,
   sealHandover,
+  startStatus,
   unacknowledgedWarnings,
 } from './shiftRules';
 import { makeCase, makeShift, makeSignedShift } from './testHelpers';
@@ -127,5 +131,54 @@ describe('handoverAlert', () => {
   });
   it('is quiet once the shift is closed', () => {
     expect(handoverAlert(makeShift({ status: 'completed' }), hoursLater(100))).toBeNull();
+  });
+});
+
+describe('startStatus and lateness alerts', () => {
+  const scheduledStart = '2026-11-17T12:00:00.000Z';
+  const minutesAfter = (minutes: number) => new Date(new Date(scheduledStart).getTime() + minutes * 60000);
+  const started = (lateMinutes: number) => makeShift({ scheduledStart, startedAt: minutesAfter(lateMinutes).toISOString(), startedByName: 'David', lateMinutes });
+  const notStarted = makeShift({ scheduledStart, startedAt: null });
+
+  it('has the same grace period as the server', () => {
+    expect(LATE_GRACE_MINUTES).toBe(15);
+  });
+
+  it('counts a start within the grace period, or early, as on time', () => {
+    expect(startStatus(started(0)).kind).toBe('on_time');
+    expect(startStatus(started(LATE_GRACE_MINUTES)).kind).toBe('on_time');
+  });
+
+  it('flags a start after the grace period as late, with the minutes', () => {
+    expect(startStatus(started(LATE_GRACE_MINUTES + 1))).toEqual({ kind: 'late', minutes: LATE_GRACE_MINUTES + 1 });
+    expect(startStatus(started(95))).toEqual({ kind: 'late', minutes: 95 });
+  });
+
+  it('waits for a shift that has not started, then flags it once the grace period has passed', () => {
+    expect(startStatus(notStarted, minutesAfter(-30))).toEqual({ kind: 'waiting', minutes: 0 });
+    expect(startStatus(notStarted, minutesAfter(LATE_GRACE_MINUTES)).kind).toBe('waiting');
+    expect(startStatus(notStarted, minutesAfter(LATE_GRACE_MINUTES + 5))).toEqual({ kind: 'not_started', minutes: LATE_GRACE_MINUTES + 5 });
+  });
+
+  it('says nothing about records made before schedules were recorded, or about the blank draft', () => {
+    expect(startStatus(makeShift()).kind).toBe('unknown');
+    expect(startStatus(makeShift({ handoverCode: '', scheduledStart })).kind).toBe('unknown');
+  });
+
+  it('writes a plain message for an administrator, and none for a shift that is on time', () => {
+    const late = started(40);
+    expect(latenessMessage(late, startStatus(late))).toMatch(/Evening shift in Import warehouse was started 40 minutes late by David/);
+    const missing = latenessMessage(notStarted, startStatus(notStarted, minutesAfter(75)));
+    expect(missing).toMatch(/has not been started/);
+    expect(missing).toMatch(/1 h 15 min ago/);
+    expect(latenessMessage(started(5), startStatus(started(5)))).toBeNull();
+  });
+
+  it('lists only late or unstarted shifts, newest first, and leaves out cancelled ones', () => {
+    const older = makeShift({ id: 'old', scheduledStart: '2026-11-16T12:00:00.000Z', startedAt: '2026-11-16T13:00:00.000Z', lateMinutes: 60 });
+    const cancelled = makeShift({ id: 'gone', status: 'archived', scheduledStart, startedAt: null });
+    const list = latenessAlerts([started(40), older, started(2), cancelled, notStarted], minutesAfter(120));
+    expect(list.map((alert) => alert.shift.id)).toEqual(['hnd-1', 'hnd-1', 'old']);
+    expect(latenessAlerts([started(2)], minutesAfter(120))).toEqual([]);
   });
 });

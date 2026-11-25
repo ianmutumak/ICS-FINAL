@@ -109,6 +109,17 @@ export function useAuth(onSignedIn: (isAdmin: boolean) => void, onSignedOut: () 
     }
   }, []);
 
+  /** Sets the signed-in person's profile picture, or removes it with null. */
+  const setProfilePhoto = useCallback(async (photo: string | null): Promise<AuthResult> => {
+    try {
+      const { user } = await api<{ user: UserStaff }>('PUT', '/auth/photo', { photo });
+      setCurrentUser(user);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: errorMessage(error) };
+    }
+  }, []);
+
   return {
     currentUser: currentUser ?? SIGNED_OUT_USER,
     isAuthenticated: currentUser !== null,
@@ -120,5 +131,6 @@ export function useAuth(onSignedIn: (isAdmin: boolean) => void, onSignedOut: () 
     signUpUser,
     signOutUser,
     changePin,
+    setProfilePhoto,
   };
 }

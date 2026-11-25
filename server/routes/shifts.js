@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { requireAdmin, requireAuth } from '../auth.js';
 import { HttpError, handle, optionalString, requireOneOf, requireString } from '../errors.js';
 import {
-  EQUIPMENT_STATUSES, SHIFT_TYPES, clockTime, embedStaff, finalizeShift, isClosed, minutesBetween, newId, newShift,
+  EQUIPMENT_STATUSES, SHIFT_TYPES, checkIn, clockTime, embedStaff, finalizeShift, isClosed, minutesBetween, newId, newShift,
   sealHandover, unacknowledgedWarnings,
 } from '../rules.js';
 import { isDuplicate } from './auth.js';
@@ -64,6 +64,7 @@ export function shiftRoutes(store, config) {
     const department = await store.departments.findOne({ name: workArea });
     const shift = newShift({
       shiftType, workArea, departmentId: department?._id, lead: embedStaff(req.user), now: now(), timeZone: config.timeZone,
+      startedBy: req.user, // pressing Start shift is the check-in, so the start time and any lateness are recorded now
     });
     shift.open = true;
     try {
@@ -73,6 +74,16 @@ export function shiftRoutes(store, config) {
       throw error;
     }
     res.status(201).json(toApi(shift));
+  }));
+
+  /** Checks in on a shift that opened by itself after the last approval. Starting twice changes nothing. */
+  router.post('/:id/start', handle(async (req, res) => {
+    requireStaff(req);
+    const saved = await mutate(req.params.id, (shift) => {
+      requireOpen(shift);
+      return checkIn(shift, req.user, now());
+    });
+    res.json(toApi(saved));
   }));
 
   router.post('/:id/cases', handle(async (req, res) => {
@@ -96,6 +107,7 @@ export function shiftRoutes(store, config) {
     const saved = await mutate(req.params.id, (shift) => {
       requireUnlocked(shift);
       shift.cases.unshift(update);
+      checkIn(shift, req.user, now()); // the first update counts as starting the shift
       return shift;
     });
     res.status(201).json(toApi(saved));
@@ -130,6 +142,7 @@ export function shiftRoutes(store, config) {
       requireUnlocked(shift);
       item.location = shift.wardOrDepartment;
       shift.equipment.push(item);
+      checkIn(shift, req.user, now());
       return shift;
     });
     res.status(201).json(toApi(saved));

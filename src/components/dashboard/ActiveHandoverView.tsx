@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useHandover } from '../../context/HandoverContext';
-import { handoverAlert, unacknowledgedWarnings } from '../../lib/shiftRules';
+import { formatTime, handoverAlert, startStatus, unacknowledgedWarnings } from '../../lib/shiftRules';
 import type { EquipmentItem } from '../../types';
-import { AlertTriangle, Check, CheckCircle2, ClipboardList, Play, Plus, Printer, ShieldCheck, Trash2, Wrench } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, ClipboardList, Play, Plus, ShieldCheck, Trash2, Wrench } from 'lucide-react';
 
 interface ActiveHandoverViewProps {
   onOpenNewCase: () => void;
@@ -56,6 +56,7 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
     heiScore,
     toggleEquipmentCustody,
     addEquipmentItem,
+    checkInToShift,
   } = useHandover();
   const cases = activeHandover.cases;
   const { signoff, equipment } = activeHandover;
@@ -96,6 +97,9 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
     signoff.outgoingStaffId !== currentUser.id;
   const waitingOnWarnings = unacknowledgedWarnings(activeHandover).length;
   const alert = handoverAlert(activeHandover, now);
+  // When the shift was meant to start, and whether it did (lateness is shown to staff and to administrators).
+  const start = startStatus(activeHandover, now);
+  const lateStarted = start.kind === 'late';
 
   // The four stages every handover moves through, and the one that needs attention now.
   const steps = [
@@ -162,15 +166,16 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
             <span>{activeHandover.shiftWindow}</span>
             <span aria-hidden="true">·</span>
             <span>{activeHandover.shiftDate}</span>
+            {activeHandover.startedAt && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className={lateStarted ? 'font-semibold text-rose-700 dark:text-rose-300' : ''}>
+                  Started {formatTime(activeHandover.startedAt)}{lateStarted ? `, ${start.minutes} min late` : start.kind === 'on_time' ? ', on time' : ''}
+                </span>
+              </>
+            )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="no-print inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-        >
-          <Printer className="h-4 w-4" /> <span className="hidden sm:inline">Print</span>
-        </button>
       </header>
 
       {alert && (
@@ -178,6 +183,23 @@ export const ActiveHandoverView: React.FC<ActiveHandoverViewProps> = ({
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
           {alert.message}
         </p>
+      )}
+
+      {/* A shift that opened by itself waits for someone to start it, so that the start time is recorded */}
+      {!activeHandover.startedAt && start.kind !== 'unknown' && !hasAdminClearance && (
+        <section aria-label="Start the shift" className={`no-print flex flex-col gap-3 rounded-2xl border px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${
+          start.kind === 'not_started' ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30' : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
+        }`}>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Start your shift</h2>
+            <p className="mt-0.5 text-base text-slate-600 dark:text-slate-300">
+              {start.kind === 'not_started'
+                ? `This shift was due to start at ${formatTime(activeHandover.scheduledStart as string)}. Starting now will be recorded as ${start.minutes} minutes late.`
+                : `This shift starts at ${formatTime(activeHandover.scheduledStart as string)}. Press Start when you begin, and the time is recorded.`}
+            </p>
+          </div>
+          <button onClick={() => void checkInToShift()} className={`${primaryButton} shrink-0`}><Play className="h-5 w-5" /> Start shift</button>
+        </section>
       )}
 
       {/* Progress and the next thing to do */}

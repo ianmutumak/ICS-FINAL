@@ -10,9 +10,11 @@ University.
 
 ## What it does
 
-- **Record:** staff start a shift and log SBAR updates as things happen, with an
-  optional safety warning shown at the top of an update. Equipment in custody is
-  listed and checked during the handover.
+- **Record:** staff start a shift and log SBAR updates as things happen. Each of Situation,
+  Background, Assessment and Recommendation is picked from a list of ready-made cargo and
+  warehouse wording (or filled at once from a common case), and the person adds only what is
+  unusual. An optional safety warning, also picked from a list, is shown at the top of the
+  update. Equipment in custody is listed and checked during the handover.
 - **Sign:** the outgoing staff member signs first, then the incoming staff
   member signs with a different account. The incoming staff member must
   acknowledge every safety warning before they can sign. Updates and equipment
@@ -25,12 +27,17 @@ University.
 - **Watch:** a live Handover Effectiveness Index (0 to 100) shows how complete the
   handover is, and a banner flags a shift left unsigned for 9.5 hours or a signed
   handover left unapproved for 4 hours.
-- **Administer:** manage users, facility zones, incidents, the override log and a
-  read-only audit trail of who did what and when.
+- **Start on time:** starting a shift records who started it and when, against the shift's
+  scheduled start (07:00, 15:00 and 23:00). A start more than 15 minutes late is shown on the
+  handover and flagged to administrators, apart from the workload forecast. The work area is
+  chosen from the zones an administrator added, or from standard warehouse areas until then.
+- **Administer:** manage users, facility zones and incidents, see shift start times and
+  lateness, and read an audit trail of who did what and when.
 - **Measure:** statistics and charts on handovers, with a machine learning
   forecast of the workload for the next 14 days. The administrator can plan for or
   dismiss each forecast warning, and the decision is recorded in the audit trail.
-- **Print:** a handover can be printed from the handover screen.
+- **Profile and theme:** each person can add a profile picture and change their own PIN, and
+  switch between light and dark mode. The choice is remembered on that device.
 
 ## Tech stack
 
@@ -219,6 +226,7 @@ can be retrained on them.
 | `npm run lint` | Type-checks the project |
 | `npm run backup` | Saves the whole database to `backups/` |
 | `npm run restore -- <file>` | Restores a backup into an empty database (`--replace` to overwrite) |
+| `npm run demo:seed` | Fills a local system with invented demo handovers (see `scripts/seed-demo.js`) |
 
 ## Project structure
 
@@ -230,7 +238,7 @@ server/                    The API (Express and MongoDB)
   routes/                  auth, users, shifts, and the other records
   backup.js                Database export and import
   *.test.js                Server tests against a real MongoDB
-scripts/                   dev launcher, backup and restore
+scripts/                   dev launcher, backup, restore and demo data
 render.yaml                Deployment blueprint for Render
 ml/                        Synthetic data generator and forecast model (Python)
 src/
@@ -238,13 +246,13 @@ src/
   components/
     auth/                  Sign-in
     dashboard/             The handover screen
-    modals/                Start shift, add update, review and sign, change PIN
-    admin/                 Admin console: users, audit trail, timing study
+    modals/                Start shift, add update, review and sign, edit profile
+    admin/                 Admin console: users, zones, shift starts, audit trail
     analytics/             Statistics, charts, forecast
     layout/, common/       Header and icons
   context/                 Auth, shift, facility and forecast-review hooks
-  lib/                     API client, shift rules, audit trail, timing study, statistics
-  data/                    Demo statistics and forecast, written by ml/
+  lib/                     API client, shift rules, audit trail, statistics, theme
+  data/                    SBAR templates, work areas, demo statistics and forecast (written by ml/)
   types/                   Shared types
 ```
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { KeyRound, LogOut } from 'lucide-react';
-import { ChangePinModal } from '../modals/ChangePinModal';
+import { LogOut, Moon, Sun } from 'lucide-react';
+import { EditProfileModal } from '../modals/EditProfileModal';
+import { useTheme } from '../../lib/theme';
 import { useHandover, NavigationTab } from '../../context/HandoverContext';
 import { ZamuLogoIcon } from '../common/CustomSvgIcons';
 
@@ -9,7 +10,8 @@ const initialsOf = (name: string) =>
 
 export const Header: React.FC = () => {
   const { currentUser, hasAdminClearance, activeTab, setActiveTab, signOutUser } = useHandover();
-  const [pinOpen, setPinOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const isAdmin = hasAdminClearance && Boolean(currentUser.isAdmin);
 
   const tabs: { id: NavigationTab; label: string }[] = [
@@ -56,16 +58,23 @@ export const Header: React.FC = () => {
               {isAdmin ? 'Administrator' : currentUser.role || 'Staff member'}
             </p>
           </div>
-          <span aria-hidden="true" className="hidden h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white sm:flex">
-            {initialsOf(currentUser.name)}
-          </span>
           <button
-            onClick={() => setPinOpen(true)}
-            aria-label="Change PIN"
-            title="Change PIN"
-            className="inline-flex items-center rounded-lg px-2.5 py-2 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            className="inline-flex items-center rounded-lg px-2 py-2 text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
           >
-            <KeyRound className="h-4 w-4" />
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+          <button
+            onClick={() => setProfileOpen(true)}
+            aria-label="Edit profile"
+            title="Edit profile"
+            className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-700 text-sm font-bold text-white ring-offset-2 hover:ring-2 hover:ring-teal-600 focus-visible:ring-2 focus-visible:ring-teal-600 dark:ring-offset-slate-900"
+          >
+            {currentUser.photo
+              ? <img src={currentUser.photo} alt="" className="h-full w-full object-cover" />
+              : <span aria-hidden="true">{initialsOf(currentUser.name)}</span>}
           </button>
           <button
             onClick={signOutUser}
@@ -78,7 +87,7 @@ export const Header: React.FC = () => {
         </div>
       </div>
     </header>
-    {pinOpen && <ChangePinModal onClose={() => setPinOpen(false)} />}
+    {profileOpen && <EditProfileModal onClose={() => setProfileOpen(false)} />}
     </>
   );
 };

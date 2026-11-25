@@ -1,4 +1,5 @@
 import type { AdminOverrideLog, HandoverRecord } from '../types';
+import { LATE_GRACE_MINUTES } from './shiftRules';
 
 /** One administrator decision about a forecast warning, kept as a record of human oversight. */
 export interface ForecastDecision {
@@ -60,10 +61,16 @@ export function buildAuditEvents(args: {
     const base = { shiftId: shift.id, code: shift.handoverCode };
     const { signoff } = shift;
     if (shift.createdAt) {
+      // Once someone has started the shift, the entry carries their name, the time they started and any lateness.
+      const startedAt = shift.startedAt || undefined;
+      const late = shift.lateMinutes ?? 0;
+      const timing = startedAt && shift.scheduledStart
+        ? late > LATE_GRACE_MINUTES ? `, started ${late} min late` : ', started on time'
+        : '';
       events.push({
-        ...base, id: `${shift.id}-start`, at: shift.createdAt, type: 'shift_started',
-        who: signoff.outgoingStaffName || shift.leadOutgoing.name,
-        detail: `${shift.shiftType} shift in ${shift.wardOrDepartment}`,
+        ...base, id: `${shift.id}-start`, at: startedAt ?? shift.createdAt, type: 'shift_started',
+        who: (startedAt && shift.startedByName) || signoff.outgoingStaffName || shift.leadOutgoing.name,
+        detail: `${shift.shiftType} shift in ${shift.wardOrDepartment}${timing}`,
       });
     }
     if (signoff.outgoingConfirmed && signoff.outgoingSignedAt) {

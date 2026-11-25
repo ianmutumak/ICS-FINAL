@@ -7,6 +7,21 @@ import { buildUser, staffKey } from '../store.js';
 
 export const isDuplicate = (error) => error?.code === 11000;
 
+// A profile picture is stored as a small data URL, so it needs no file storage. The browser shrinks it before sending;
+// the server still checks the type, the size and the first bytes, so that only a real picture is ever kept.
+const PHOTO_SIGNATURES = { jpeg: [0xff, 0xd8, 0xff], png: [0x89, 0x50, 0x4e, 0x47], webp: [0x52, 0x49, 0x46, 0x46] };
+export const MAX_PHOTO_CHARS = 70_000; // the request limit is 100 kb
+
+export function checkPhoto(value) {
+  if (typeof value !== 'string') throw new HttpError(400, 'Choose a picture to upload.');
+  if (value.length > MAX_PHOTO_CHARS) throw new HttpError(400, 'That picture is too large. Choose a smaller one.');
+  const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match) throw new HttpError(400, 'Choose a JPEG, PNG or WebP picture.');
+  const bytes = Buffer.from(match[2], 'base64');
+  if (!PHOTO_SIGNATURES[match[1]].every((byte, i) => bytes[i] === byte)) throw new HttpError(400, 'That file is not a valid picture.');
+  return value;
+}
+
 export function authRoutes(store, config) {
   const router = Router();
   const limiter = createLoginLimiter();
@@ -74,6 +89,14 @@ export function authRoutes(store, config) {
     if (!isValidPin(req.body?.newPin)) throw new HttpError(400, 'The new PIN must be 4 to 6 digits.');
     await store.users.updateOne({ _id: user._id }, { $set: { pinHash: await hashPin(req.body.newPin) } });
     res.json({ ok: true });
+  }));
+
+  // Sets or removes the signed-in person's own profile picture. Nobody can change anyone else's.
+  router.put('/photo', requireAuth, handle(async (req, res) => {
+    const photo = req.body?.photo;
+    const change = photo === null ? { $unset: { photo: '' } } : { $set: { photo: checkPhoto(photo) } };
+    await store.users.updateOne({ _id: req.user.id }, change);
+    res.json({ user: publicUser(await store.users.findOne({ _id: req.user.id })) });
   }));
 
   return router;

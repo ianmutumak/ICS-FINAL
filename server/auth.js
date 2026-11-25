@@ -73,6 +73,7 @@ export const publicUser = (doc) => ({
   department: doc.department || '',
   qualification: doc.qualification || '',
   avatarSeed: doc.avatarSeed || '',
+  photo: doc.photo || '',
   isAdmin: Boolean(doc.isAdmin),
   status: doc.status || 'active',
 });

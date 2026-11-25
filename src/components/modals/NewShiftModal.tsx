@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useHandover } from '../../context/HandoverContext';
 import { ShiftType } from '../../types';
 import { X, Building2 } from 'lucide-react';
+import { DEFAULT_WORK_AREAS, OTHER_AREA, preselectArea } from '../../data/workAreas';
 
 interface NewShiftModalProps {
   isOpen: boolean;
@@ -19,26 +20,30 @@ function currentShiftType(): ShiftType {
 export const NewShiftModal: React.FC<NewShiftModalProps> = ({ isOpen, onClose }) => {
   const { startNewShift, setActiveTab, departments, currentUser } = useHandover();
 
-  // null until the person picks or types a work area themselves.
+  // null until the person picks a work area themselves.
   const [ward, setWard] = useState<string | null>(null);
+  const [otherArea, setOtherArea] = useState('');
   const [shiftType, setShiftType] = useState<ShiftType>(currentShiftType);
 
   if (!isOpen) return null;
 
-  // With zones configured the work area is picked from them; otherwise it is typed in,
-  // starting from the signed-in person's own department.
+  // The administrator's zones are offered when there are any. Until then a list of usual warehouse areas is offered,
+  // so a worker picks instead of typing, with "Other" for anything that is not on it.
   const hasZones = departments.length > 0;
-  const selectedWard = hasZones
-    ? (departments.some((dept) => dept.name === ward) ? (ward as string) : departments[0].name)
-    : ward ?? currentUser.department;
+  const areaNames = hasZones ? departments.map((dept) => dept.name) : DEFAULT_WORK_AREAS;
+  const selectedWard = ward !== null && (ward === OTHER_AREA || areaNames.includes(ward))
+    ? ward
+    : preselectArea(areaNames, currentUser.department);
+  const typing = selectedWard === OTHER_AREA;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const workArea = selectedWard.trim();
+    const workArea = (typing ? otherArea : selectedWard).trim();
     if (!workArea) return;
     startNewShift(shiftType, workArea);
     setActiveTab('active-handover');
     setWard(null);
+    setOtherArea('');
     onClose();
   };
 
@@ -66,25 +71,33 @@ export const NewShiftModal: React.FC<NewShiftModalProps> = ({ isOpen, onClose })
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <label className="block font-semibold text-slate-700 dark:text-slate-300">
             Work area
-            {hasZones ? (
-              <select value={selectedWard} onChange={(e) => setWard(e.target.value)} className={`${fieldClass} mt-1 font-normal`}>
-                {departments.map((dept) => (
-                  <option key={dept.id} value={dept.name}>
-                    {dept.name} ({dept.code})
-                  </option>
-                ))}
-              </select>
-            ) : (
+            <select value={selectedWard} onChange={(e) => setWard(e.target.value)} className={`${fieldClass} mt-1 font-normal`}>
+              {hasZones
+                ? departments.map((dept) => <option key={dept.id} value={dept.name}>{dept.name} ({dept.code})</option>)
+                : DEFAULT_WORK_AREAS.map((name) => <option key={name} value={name}>{name}</option>)}
+              {!hasZones && <option value={OTHER_AREA}>Other area, I will type it</option>}
+            </select>
+            {!hasZones && (
+              <span className="mt-1 block font-normal text-slate-500 dark:text-slate-400">
+                These are standard areas. Your administrator can add the site's own zones under Admin, Zones.
+              </span>
+            )}
+          </label>
+          {typing && (
+            <label className="block font-semibold text-slate-700 dark:text-slate-300">
+              Name of the area
               <input
                 type="text"
                 required
-                value={selectedWard}
-                onChange={(e) => setWard(e.target.value)}
-                placeholder="For example, Import warehouse"
+                autoFocus
+                maxLength={80}
+                value={otherArea}
+                onChange={(e) => setOtherArea(e.target.value)}
+                placeholder="For example, Dock 5"
                 className={`${fieldClass} mt-1 font-normal`}
               />
-            )}
-          </label>
+            </label>
+          )}
 
           <div>
             <span className="block font-semibold text-slate-700 dark:text-slate-300 mb-1">Shift</span>

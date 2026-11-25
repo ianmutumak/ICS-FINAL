@@ -20,6 +20,8 @@ export interface UserStaff {
   department: string;
   qualification: string;
   avatarSeed: string;
+  /** The person's profile picture as a small data URL. Empty when they have not set one. */
+  photo?: string;
   isAdmin?: boolean;
   status?: 'active' | 'on_leave' | 'suspended';
 }
@@ -129,6 +131,14 @@ export interface HandoverRecord {
   actions: ShiftActionItem[];
   signoff: DualSignoff;
   createdAt: string;
+  /** When this shift was meant to begin (the nearest scheduled start for its type). Older records do not have it. */
+  scheduledStart?: string;
+  /** When someone started the shift: pressed Start shift, or added the first update. Null until then. */
+  startedAt?: string | null;
+  startedById?: string;
+  startedByName?: string;
+  /** Minutes after the scheduled start that the shift was started. Zero when early or on time. */
+  lateMinutes?: number;
   completedAt?: string;
   /** The administrator who approved the handover. */
   approvedBy?: string;

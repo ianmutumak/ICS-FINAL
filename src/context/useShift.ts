@@ -124,6 +124,10 @@ export function useShift({ isAuthenticated, hasAdminClearance, currentUser, repo
   const startNewShift = (shiftType: ShiftType, workArea: string) =>
     act(async () => apply(await api<HandoverRecord>('POST', '/shifts', { shiftType, workArea })));
 
+  // A shift that opened after the last approval has no start time until someone checks in (or adds the first update).
+  const checkInToShift = () =>
+    act(async () => apply(await api<HandoverRecord>('POST', `${shiftPath}/start`)));
+
   const addCase = (update: NewUpdate) =>
     act(async () => apply(await api<HandoverRecord>('POST', `${shiftPath}/cases`, update)));
 
@@ -184,6 +188,7 @@ export function useShift({ isAuthenticated, hasAdminClearance, currentUser, repo
     isLocked,
     currentUserId: currentUser.id,
     startNewShift,
+    checkInToShift,
     addCase,
     deleteCase,
     addEquipmentItem,

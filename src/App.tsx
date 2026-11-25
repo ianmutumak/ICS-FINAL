@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Clock } from 'lucide-react';
+import { latenessAlerts } from './lib/shiftRules';
 import { HandoverProvider, useHandover } from './context/HandoverContext';
 import { Header } from './components/layout/Header';
 import { ActiveHandoverView } from './components/dashboard/ActiveHandoverView';
@@ -10,11 +12,18 @@ import { SignoffModal } from './components/modals/SignoffModal';
 import { NewShiftModal } from './components/modals/NewShiftModal';
 
 function AppContent() {
-  const { activeTab, isAuthenticated, hasAdminClearance, currentUser, authReady, notice, dismissNotice } = useHandover();
+  const { activeTab, isAuthenticated, hasAdminClearance, currentUser, authReady, notice, dismissNotice, activeHandover, openAdminSection } = useHandover();
 
   const [isSignoffOpen, setIsSignoffOpen] = useState(false);
   const [isNewCaseOpen, setIsNewCaseOpen] = useState(false);
   const [isNewShiftOpen, setIsNewShiftOpen] = useState(false);
+  // Administrators are told when the open shift started late or has not started. The check repeats every 30 seconds.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const lateAlert = hasAdminClearance ? latenessAlerts([activeHandover], now)[0] : undefined;
 
   // While the server is asked whether a session already exists, show nothing that could flash the sign-in screen.
   if (!authReady) {
@@ -37,6 +46,12 @@ function AppContent() {
           <div role="alert" className="no-print mb-5 flex items-start justify-between gap-3 rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-base text-rose-900 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-100">
             <span>{notice}</span>
             <button type="button" onClick={dismissNotice} className="shrink-0 text-sm font-semibold underline">Dismiss</button>
+          </div>
+        )}
+        {lateAlert && (
+          <div role="status" className="no-print mb-5 flex flex-col gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-base text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+            <span className="flex items-start gap-2.5"><Clock className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" /><span><strong>Lateness:</strong> {lateAlert.message}</span></span>
+            <button type="button" onClick={() => openAdminSection('lateness')} className="shrink-0 self-start text-sm font-semibold underline sm:self-auto">See shift starts</button>
           </div>
         )}
         {activeTab === 'active-handover' && (

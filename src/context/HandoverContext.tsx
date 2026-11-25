@@ -26,6 +26,10 @@ type HandoverContextType =
     /** The latest error from the server, shown to the person until they dismiss it or the next action succeeds. */
     notice: string | null;
     dismissNotice: () => void;
+    /** A section of the administrator console to open, set by an alert that links to it. */
+    adminSection: string | null;
+    openAdminSection: (section: string) => void;
+    clearAdminSection: () => void;
   };
 
 const HandoverContext = createContext<HandoverContextType | undefined>(undefined);
@@ -34,6 +38,12 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [activeTab, setActiveTab] = useState<NavigationTab>('active-handover');
   const [notice, setNotice] = useState<string | null>(null);
   const dismissNotice = useCallback(() => setNotice(null), []);
+  const [adminSection, setAdminSection] = useState<string | null>(null);
+  const openAdminSection = useCallback((section: string) => {
+    setAdminSection(section);
+    setActiveTab('admin');
+  }, []);
+  const clearAdminSection = useCallback(() => setAdminSection(null), []);
 
   const onSignedIn = useCallback((isAdmin: boolean) => {
     setNotice(null);
@@ -56,7 +66,7 @@ export const HandoverProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   return (
     <HandoverContext.Provider
-      value={{ ...auth, ...facility, ...shift, ...review, activeTab, setActiveTab, notice, dismissNotice }}
+      value={{ ...auth, ...facility, ...shift, ...review, activeTab, setActiveTab, notice, dismissNotice, adminSection, openAdminSection, clearAdminSection }}
     >
       {children}
     </HandoverContext.Provider>

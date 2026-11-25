@@ -91,6 +91,70 @@ export function handoverAlert(shift: HandoverRecord, now: Date = new Date()): Ha
     : null;
 }
 
+/** A start up to this many minutes after the scheduled time counts as on time. Must equal LATE_GRACE_MINUTES in server/rules.js. */
+export const LATE_GRACE_MINUTES = 15;
+
+export type StartStatus =
+  /** The shift was started within the grace period (or early). */
+  | { kind: 'on_time'; minutes: number }
+  /** The shift was started after the grace period. */
+  | { kind: 'late'; minutes: number }
+  /** Not started yet, and still before the grace period has run out. */
+  | { kind: 'waiting'; minutes: number }
+  /** Not started, and the grace period has run out. */
+  | { kind: 'not_started'; minutes: number }
+  /** The record has no schedule (made before start times were recorded). */
+  | { kind: 'unknown'; minutes: 0 };
+
+/** Whether a shift started on time, started late, or has still not started, measured against its scheduled start. */
+export function startStatus(shift: HandoverRecord, now: Date = new Date()): StartStatus {
+  if (!shift.handoverCode || !shift.scheduledStart) return { kind: 'unknown', minutes: 0 };
+  if (shift.startedAt) {
+    const minutes = shift.lateMinutes ?? 0;
+    return { kind: minutes > LATE_GRACE_MINUTES ? 'late' : 'on_time', minutes };
+  }
+  const minutes = Math.max(0, Math.round((now.getTime() - new Date(shift.scheduledStart).getTime()) / 60000));
+  return { kind: minutes > LATE_GRACE_MINUTES ? 'not_started' : 'waiting', minutes };
+}
+
+const hoursAndMinutes = (minutes: number) =>
+  minutes < 60 ? `${minutes} minutes` : `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min`;
+
+export interface LatenessAlert {
+  shift: HandoverRecord;
+  status: StartStatus;
+  message: string;
+}
+
+/** The sentence an administrator reads about a late start, or null when the shift is not late. */
+export function latenessMessage(shift: HandoverRecord, status: StartStatus): string | null {
+  const name = `${shift.shiftType[0].toUpperCase()}${shift.shiftType.slice(1)} shift`;
+  const where = shift.wardOrDepartment ? ` in ${shift.wardOrDepartment}` : '';
+  const scheduled = shift.scheduledStart ? formatTime(shift.scheduledStart) : '';
+  if (status.kind === 'late') {
+    return `${name}${where} was started ${hoursAndMinutes(status.minutes)} late by ${shift.startedByName || 'a staff member'}. It was due at ${scheduled}.`;
+  }
+  if (status.kind === 'not_started') {
+    return `${name}${where} has not been started. It was due at ${scheduled}, ${hoursAndMinutes(status.minutes)} ago.`;
+  }
+  return null;
+}
+
+/**
+ * Shifts that started late or have not started, newest first. Lateness is separate from the workload forecast:
+ * it is about when work began, not how much work there is.
+ */
+export function latenessAlerts(shifts: HandoverRecord[], now: Date = new Date()): LatenessAlert[] {
+  return shifts
+    .filter((shift) => shift.handoverCode && shift.status !== 'archived')
+    .map((shift) => ({ shift, status: startStatus(shift, now) }))
+    .flatMap(({ shift, status }) => {
+      const message = latenessMessage(shift, status);
+      return message ? [{ shift, status, message }] : [];
+    })
+    .sort((a, b) => (b.shift.scheduledStart ?? '').localeCompare(a.shift.scheduledStart ?? ''));
+}
+
 /** Handover Effectiveness Index: SBAR completeness (40), safety acknowledgement (35), equipment custody (25). */
 export function calculateHEI(shift: HandoverRecord): HandoverEffectivenessIndex {
   const totalCases = shift.cases.length;

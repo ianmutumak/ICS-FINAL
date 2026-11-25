@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AuditTrailView } from './AuditTrailView';
-import { TimingStudyView } from './TimingStudyView';
+import { LatenessView } from './LatenessView';
+import { latenessAlerts } from '../../lib/shiftRules';
 import { UserManagement } from './UserManagement';
 import { useHandover } from '../../context/HandoverContext';
 import {
@@ -37,7 +38,6 @@ export const AdminConsoleView: React.FC = () => {
     incidents,
     resolveIncident,
     reportIncident,
-    overrideLogs,
     departments,
     addDepartment,
     cancelShift,
@@ -45,11 +45,18 @@ export const AdminConsoleView: React.FC = () => {
     categories,
     addCategory,
     deleteCategory,
-    tasks,
     setActiveTab,
+    adminSection,
+    clearAdminSection,
   } = useHandover();
 
-  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'shifts' | 'incidents' | 'tasks' | 'overrides' | 'zones' | 'audit' | 'timing'>('users');
+  const [activeAdminTab, setActiveAdminTab] = useState<'users' | 'shifts' | 'incidents' | 'zones' | 'audit' | 'lateness'>(adminSection === 'lateness' ? 'lateness' : 'users');
+  // An alert elsewhere can send the administrator straight to a section of the console.
+  React.useEffect(() => {
+    if (adminSection === 'lateness') setActiveAdminTab('lateness');
+    if (adminSection) clearAdminSection();
+  }, [adminSection, clearAdminSection]);
+  const lateCount = latenessAlerts([activeHandover, ...archive]).length;
 
   // Override dialog state
   const [selectedShiftToOverride, setSelectedShiftToOverride] = useState<string | null>(null);
@@ -221,24 +228,14 @@ export const AdminConsoleView: React.FC = () => {
             Incident Resolution ({incidents.filter((i) => i.status !== 'resolved').length} Open)
           </button>
           <button
-            onClick={() => setActiveAdminTab('tasks')}
+            onClick={() => setActiveAdminTab('lateness')}
             className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              activeAdminTab === 'tasks'
+              activeAdminTab === 'lateness'
                 ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
             }`}
           >
-            Global Task Surveillance ({tasks.length})
-          </button>
-          <button
-            onClick={() => setActiveAdminTab('overrides')}
-            className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              activeAdminTab === 'overrides'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-            }`}
-          >
-            Override Audit Ledger ({overrideLogs.length})
+            Shift Starts{lateCount > 0 ? ` (${lateCount} late)` : ''}
           </button>
           <button
             onClick={() => setActiveAdminTab('audit')}
@@ -249,16 +246,6 @@ export const AdminConsoleView: React.FC = () => {
             }`}
           >
             Audit Trail
-          </button>
-          <button
-            onClick={() => setActiveAdminTab('timing')}
-            className={`py-1.5 px-3 rounded-md font-medium transition-colors cursor-pointer whitespace-nowrap ${
-              activeAdminTab === 'timing'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
-            }`}
-          >
-            Timing Study
           </button>
         </div>
       </section>
@@ -643,137 +630,8 @@ export const AdminConsoleView: React.FC = () => {
         </div>
       )}
 
-      {/* Tab 4: Global Task Surveillance */}
-      {activeAdminTab === 'tasks' && (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-4">
-          <div className="pb-3 border-b border-slate-100 dark:border-slate-800">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              Cross-Facility Task Surveillance & Aging Monitor
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Centralized surveillance of pending operational work-orders and carried-over tasks across all warehouse zones
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {departments.map((dept) => {
-              const deptTasks = tasks.filter((t) => t.departmentId === dept.id);
-              const pendingCount = deptTasks.filter((t) => t.status !== 'completed').length;
-              const urgentCount = deptTasks.filter((t) => t.priority === 'urgent' && t.status !== 'completed').length;
-              return (
-                <div
-                  key={dept.id}
-                  className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-3"
-                >
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-700/60">
-                    <span className="font-bold text-slate-900 dark:text-white text-xs truncate max-w-[140px]">
-                      {dept.name}
-                    </span>
-                    <span className="font-mono text-[10px] text-teal-700 dark:text-teal-400 font-bold">
-                      {dept.code}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1 text-xs">
-                    <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                      <span>Pending Orders:</span>
-                      <strong className="text-slate-900 dark:text-white font-mono">{pendingCount}</strong>
-                    </div>
-                    <div className="flex justify-between text-rose-600 dark:text-rose-400">
-                      <span>Urgent / STAT:</span>
-                      <strong className="font-mono">{urgentCount}</strong>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 max-h-36 overflow-y-auto">
-                    {deptTasks.map((t) => (
-                      <div
-                        key={t.id}
-                        className={`text-[11px] p-1.5 rounded border ${
-                          t.status === 'completed'
-                            ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 line-through'
-                            : t.priority === 'urgent'
-                            ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 text-rose-800 dark:text-rose-300 font-medium'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        <div className="truncate">{t.title}</div>
-                        <div className="text-[9px] text-slate-400 font-mono mt-0.5">
-                          Due: {t.dueTime} · {t.assignedTo}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {activeAdminTab === 'audit' && <AuditTrailView />}
-      {activeAdminTab === 'timing' && <TimingStudyView />}
-
-      {/* Tab 5: Override Audit Ledger */}
-      {activeAdminTab === 'overrides' && (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-200 dark:border-slate-800">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-              Immutable Administrative Override Ledger
-            </h3>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              Audit trail of supervisor emergency sign-offs and state overrides
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-mono text-[11px] bg-slate-50/50 dark:bg-slate-800/40">
-                  <th className="py-2.5 px-4 font-semibold">Shift Code</th>
-                  <th className="py-2.5 px-4 font-semibold">Department</th>
-                  <th className="py-2.5 px-4 font-semibold">Authorizing Admin</th>
-                  <th className="py-2.5 px-4 font-semibold">Action Type</th>
-                  <th className="py-2.5 px-4 font-semibold">Documented Rationale</th>
-                  <th className="py-2.5 px-4 text-right font-semibold">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {overrideLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400">
-                      No administrative overrides recorded
-                    </td>
-                  </tr>
-                ) : (
-                  overrideLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                      <td className="py-2.5 px-4 font-mono font-bold text-teal-700 dark:text-teal-400">
-                        {log.shiftCode}
-                      </td>
-                      <td className="py-2.5 px-4 text-slate-900 dark:text-white">
-                        {log.departmentName}
-                      </td>
-                      <td className="py-2.5 px-4 font-medium text-slate-800 dark:text-slate-200">
-                        {log.adminName}
-                      </td>
-                      <td className="py-2.5 px-4 font-mono text-[11px] text-rose-700 dark:text-rose-400">
-                        {log.actionType}
-                      </td>
-                      <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300 max-w-xs leading-relaxed">
-                        "{log.reason}"
-                      </td>
-                      <td className="py-2.5 px-4 font-mono tabular-nums text-slate-500 text-right">
-                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      {activeAdminTab === 'lateness' && <LatenessView />}
 
       {/* Override Dialog Modal */}
       {selectedShiftToCancel && (

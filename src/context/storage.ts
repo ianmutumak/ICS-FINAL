@@ -1,6 +1,7 @@
 /** Browser storage keys. Only small, harmless preferences are kept in the browser; the records live on the server. */
 export const STORAGE_KEYS = {
   demoData: 'zamu_statistics_demo_data_v7',
+  theme: 'zamu_theme',
 } as const;
 
 // One-time housekeeping. Earlier versions kept accounts (including PINs), shifts and sessions in the browser.

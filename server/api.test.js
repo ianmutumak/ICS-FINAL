@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
-import { sealHandover as serverSeal } from './rules.js';
+import { LATE_GRACE_MINUTES, lateMinutesFor, scheduledStartFor, sealHandover as serverSeal } from './rules.js';
 import { connectStore, seedAdministrator } from './store.js';
 import { sealHandover as clientSeal } from '../src/lib/shiftRules';
 
@@ -319,6 +319,9 @@ describe('the handover workflow', () => {
     expect(started.data.handoverCode).toMatch(/^ZAMU-\d{4}-EVE-\d{3}$/);
     expect(started.data).not.toHaveProperty('_id');
     expect(started.data).not.toHaveProperty('rev');
+    // Pressing Start shift records who started it and when, and how far that was from the scheduled start.
+    expect(started.data).toMatchObject({ startedByName: 'Anna Wanjiru', scheduledStart: expect.any(String), startedAt: expect.any(String), lateMinutes: expect.any(Number) });
+    expect(started.data.lateMinutes).toBeGreaterThanOrEqual(0);
     shiftId = started.data.id;
 
     const second = await call('POST', '/api/shifts', { cookie: ben, body: { shiftType: 'night', workArea: 'Other' } });
@@ -442,6 +445,8 @@ describe('the handover workflow', () => {
     expect(next.equipment.every((item) => item.custodyChecked === false)).toBe(true);
     expect(next.signoff.outgoingConfirmed).toBe(false);
     expect(next.leadOutgoing.name).toBe('Ben Kiprop');
+    // A shift that opens by itself has a scheduled start but no start time until someone starts it.
+    expect(next).toMatchObject({ startedAt: null, lateMinutes: 0, scheduledStart: expect.any(String) });
 
     expect((await call('GET', '/api/shifts/active', { cookie: carl })).data.id).toBe(next.id);
     expect((await call('POST', `/api/shifts/${shiftId}/approve`, { cookie: admin })).status).toBe(409);
@@ -475,6 +480,29 @@ describe('the handover workflow', () => {
     const ledger = (await call('GET', '/api/overrides', { cookie: admin })).data;
     expect(ledger.filter((entry) => entry.reason === 'Lead was unavailable')).toHaveLength(1);
     expect(ledger[0]).toMatchObject({ actionType: 'emergency_signoff', adminName: expect.any(String) });
+  });
+
+  it('lets staff start a shift that opened by itself, once, and not administrators', async () => {
+    const open = (await call('GET', '/api/shifts/active', { cookie: carl })).data;
+    expect(open.startedAt).toBeNull();
+    expect((await call('POST', `/api/shifts/${open.id}/start`, { cookie: admin })).status).toBe(403);
+    const first = await call('POST', `/api/shifts/${open.id}/start`, { cookie: anna });
+    expect(first.status).toBe(200);
+    expect(first.data).toMatchObject({ startedByName: 'Anna Wanjiru', startedAt: expect.any(String), lateMinutes: expect.any(Number) });
+    const second = await call('POST', `/api/shifts/${open.id}/start`, { cookie: ben });
+    expect(second.status).toBe(200);
+    expect(second.data.startedAt).toBe(first.data.startedAt);
+    expect(second.data.startedByName).toBe('Anna Wanjiru');
+    expect((await call('POST', '/api/shifts/does-not-exist/start', { cookie: anna })).status).toBe(404);
+  });
+
+  it('counts the first update as starting a shift that has not been started', async () => {
+    const open = (await call('GET', '/api/shifts/active', { cookie: carl })).data;
+    // Cancel and start again from a clean, unstarted shift is not possible, so check the rule on the stored record.
+    await store.shifts.updateOne({ _id: open.id }, { $set: { startedAt: null, startedById: undefined, startedByName: undefined, lateMinutes: 0 } });
+    const added = await call('POST', `/api/shifts/${open.id}/cases`, { cookie: ben, body: SBAR });
+    expect(added.status).toBe(201);
+    expect(added.data).toMatchObject({ startedByName: 'Ben Kiprop', startedAt: expect.any(String) });
   });
 
   it('cancels a shift that cannot be signed, with a reason, and records it', async () => {
@@ -573,5 +601,96 @@ describe('server hygiene', () => {
   it('requires a long session secret in production', () => {
     expect(() => loadConfig({ NODE_ENV: 'production', SESSION_SECRET: 'short' })).toThrow(/SESSION_SECRET/);
     expect(() => loadConfig({ NODE_ENV: 'production', SESSION_SECRET: 'y'.repeat(32) })).not.toThrow();
+  });
+});
+
+describe('the shift schedule', () => {
+  const nairobi = 'Africa/Nairobi';
+
+  it('uses a 15 minute grace period', () => {
+    expect(LATE_GRACE_MINUTES).toBe(15);
+  });
+
+  it('finds the scheduled start of a shift opened after it began', () => {
+    // 08:00 in Nairobi is 05:00 UTC; the morning shift is meant to start at 07:00, which is 04:00 UTC.
+    const now = new Date('2026-11-19T05:00:00Z');
+    const scheduled = scheduledStartFor('morning', now, nairobi);
+    expect(scheduled).toBe('2026-11-19T04:00:00.000Z');
+    expect(lateMinutesFor(now.toISOString(), scheduled)).toBe(60);
+  });
+
+  it('measures a night shift opened after midnight against 23:00 the evening before', () => {
+    const now = new Date('2026-11-19T21:30:00Z'); // 00:30 on 20 November in Nairobi
+    const scheduled = scheduledStartFor('night', now, nairobi);
+    expect(scheduled).toBe('2026-11-19T20:00:00.000Z');
+    expect(lateMinutesFor(now.toISOString(), scheduled)).toBe(90);
+  });
+
+  it('treats an early start as on time, not as hours late', () => {
+    const now = new Date('2026-11-19T09:00:00Z'); // 12:00 in Nairobi, three hours before the evening shift
+    const scheduled = scheduledStartFor('evening', now, nairobi);
+    expect(scheduled).toBe('2026-11-19T12:00:00.000Z');
+    expect(lateMinutesFor(now.toISOString(), scheduled)).toBe(0);
+  });
+
+  it('works in another time zone, including daylight saving time', () => {
+    const now = new Date('2026-07-01T11:20:00Z'); // 07:20 in New York in summer
+    const scheduled = scheduledStartFor('morning', now, 'America/New_York');
+    expect(scheduled).toBe('2026-07-01T11:00:00.000Z');
+    expect(lateMinutesFor(now.toISOString(), scheduled)).toBe(20);
+    const winter = new Date('2026-01-15T12:20:00Z'); // 07:20 in New York in winter
+    expect(scheduledStartFor('morning', winter, 'America/New_York')).toBe('2026-01-15T12:00:00.000Z');
+  });
+});
+
+describe('profile pictures', () => {
+  const JPEG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  let pia;
+  let sam;
+
+  beforeAll(async () => {
+    const admin = await login(ADMIN.staffNumber, ADMIN.pin);
+    pia = await createStaff(admin, 'PH-0001', 'Pia Hassan');
+    sam = await createStaff(admin, 'PH-0002', 'Sam Ouma');
+  });
+
+  it('needs a signed-in user', async () => {
+    expect((await call('PUT', '/api/auth/photo', { body: { photo: JPEG } })).status).toBe(401);
+  });
+
+  it('keeps a JPEG or PNG for the person who sent it, and returns it with their account', async () => {
+    const saved = await call('PUT', '/api/auth/photo', { cookie: pia, body: { photo: JPEG } });
+    expect(saved.status).toBe(200);
+    expect(saved.data.user).toMatchObject({ staffNumber: 'PH-0001', photo: JPEG });
+    expect((await call('GET', '/api/auth/me', { cookie: pia })).data.user.photo).toBe(JPEG);
+    const png = await call('PUT', '/api/auth/photo', { cookie: pia, body: { photo: PNG } });
+    expect(png.data.user.photo).toBe(PNG);
+  });
+
+  it('does not touch anyone else\'s picture', async () => {
+    expect((await call('GET', '/api/auth/me', { cookie: sam })).data.user.photo).toBe('');
+  });
+
+  it('refuses anything that is not a real, small picture', async () => {
+    const refuse = async (photo) => (await call('PUT', '/api/auth/photo', { cookie: pia, body: { photo } })).status;
+    expect(await refuse('data:image/svg+xml;base64,PHN2Zy8+')).toBe(400); // scripts can hide in an SVG
+    expect(await refuse('data:text/html;base64,PGgxPmhpPC9oMT4=')).toBe(400);
+    expect(await refuse('https://example.com/me.png')).toBe(400);
+    expect(await refuse('not a picture')).toBe(400);
+    expect(await refuse(`data:image/png;base64,${JPEG.split(',')[1]}`)).toBe(400); // JPEG bytes labelled as PNG
+    expect(await refuse(`data:image/jpeg;base64,${'A'.repeat(70_000)}`)).toBe(400); // too large
+    expect(await refuse(12345)).toBe(400);
+    expect(await refuse({ $ne: null })).toBe(400);
+    expect((await call('PUT', '/api/auth/photo', { cookie: pia })).status).toBe(400);
+    // The refused attempts left the earlier picture in place.
+    expect((await call('GET', '/api/auth/me', { cookie: pia })).data.user.photo).toBe(PNG);
+  });
+
+  it('removes the picture when asked', async () => {
+    const removed = await call('PUT', '/api/auth/photo', { cookie: pia, body: { photo: null } });
+    expect(removed.status).toBe(200);
+    expect(removed.data.user.photo).toBe('');
+    expect((await call('GET', '/api/auth/me', { cookie: pia })).data.user.photo).toBe('');
   });
 });

@@ -20,6 +20,61 @@ export function localDateString(date, timeZone) {
 export const clockTime = (date, timeZone) =>
   date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone });
 
+/** When each shift is meant to begin, as a local clock time. */
+export const SHIFT_STARTS = { morning: '07:00', evening: '15:00', night: '23:00' };
+/** A start up to this many minutes after the scheduled time is on time. Must equal LATE_GRACE_MINUTES in src/lib/shiftRules.ts. */
+export const LATE_GRACE_MINUTES = 15;
+
+/** How far a time zone is ahead of UTC at a given moment, in milliseconds. */
+function zoneOffsetMs(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(date);
+  const get = (type) => Number(parts.find((part) => part.type === type).value);
+  return Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second')) - date.getTime();
+}
+
+/** The moment that a local date and clock time ('2026-11-19', '07:00') fall on in a time zone. */
+function zonedInstant(dateString, clock, timeZone) {
+  const [year, month, day] = dateString.split('-').map(Number);
+  const [hour, minute] = clock.split(':').map(Number);
+  const wallClockAsUtc = Date.UTC(year, month - 1, day, hour, minute);
+  let guess = wallClockAsUtc;
+  for (let pass = 0; pass < 2; pass += 1) guess = wallClockAsUtc - zoneOffsetMs(new Date(guess), timeZone);
+  return new Date(guess);
+}
+
+/**
+ * The scheduled start of a shift that is being opened at `now`: the occurrence of that shift's start time
+ * (yesterday's, today's or tomorrow's) that is closest to `now`. A shift opened a little before its time is early,
+ * and one opened long after it is late, so the night shift opened at 00:30 is measured against 23:00 the day before.
+ */
+export function scheduledStartFor(shiftType, now, timeZone) {
+  const today = localDateString(now, timeZone);
+  const [year, month, day] = today.split('-').map(Number);
+  const candidates = [-1, 0, 1].map((shift) => {
+    const date = new Date(Date.UTC(year, month - 1, day + shift)).toISOString().slice(0, 10);
+    return zonedInstant(date, SHIFT_STARTS[shiftType], timeZone);
+  });
+  return candidates.reduce((best, c) => (Math.abs(c - now) < Math.abs(best - now) ? c : best)).toISOString();
+}
+
+/** Whole minutes that a start was after the scheduled time. Zero for an early or on-time start. */
+export function lateMinutesFor(startedAtIso, scheduledStartIso) {
+  const ms = new Date(startedAtIso).getTime() - new Date(scheduledStartIso).getTime();
+  return Number.isFinite(ms) && ms > 0 ? Math.round(ms / 60000) : 0;
+}
+
+/** Records who started the shift and when. Does nothing if the shift has already been started. */
+export function checkIn(shift, user, now) {
+  if (shift.startedAt) return shift;
+  shift.startedAt = now.toISOString();
+  shift.startedById = user.id;
+  shift.startedByName = user.name;
+  shift.lateMinutes = shift.scheduledStart ? lateMinutesFor(shift.startedAt, shift.scheduledStart) : 0;
+  return shift;
+}
+
 export function makeHandoverCode(shiftType, date, timeZone) {
   const year = localDateString(date, timeZone).slice(0, 4);
   return `ZAMU-${year}-${shiftType.toUpperCase().slice(0, 3)}-${randomInt(100, 1000)}`;
@@ -76,8 +131,12 @@ const emptySignoff = (lead) => ({
   incomingConfirmed: false,
 });
 
-export function newShift({ shiftType, workArea, departmentId, lead, now, timeZone }) {
-  return {
+/**
+ * A new shift. When `startedBy` is given the shift is checked in at once (a person pressed Start shift). A shift that
+ * opens by itself after an approval has no start time until someone starts it or adds the first update.
+ */
+export function newShift({ shiftType, workArea, departmentId, lead, now, timeZone, startedBy }) {
+  const shift = {
     _id: newId('hnd'),
     rev: 0,
     handoverCode: makeHandoverCode(shiftType, now, timeZone),
@@ -98,7 +157,12 @@ export function newShift({ shiftType, workArea, departmentId, lead, now, timeZon
     actions: [],
     signoff: emptySignoff(lead),
     createdAt: now.toISOString(),
+    scheduledStart: scheduledStartFor(shiftType, now, timeZone),
+    startedAt: null,
+    lateMinutes: 0,
   };
+  if (startedBy) checkIn(shift, startedBy, now);
+  return shift;
 }
 
 /**

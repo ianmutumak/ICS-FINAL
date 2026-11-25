@@ -13,7 +13,8 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "backup": "node scripts/backup.js",
-    "restore": "node scripts/restore.js"
+    "restore": "node scripts/restore.js",
+    "demo:seed": "node scripts/seed-demo.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
