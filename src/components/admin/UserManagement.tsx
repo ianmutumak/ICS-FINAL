@@ -1,8 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Lock, Pencil, Plus, Search, Trash2, UserPlus, X } from 'lucide-react';
+import { Dices, Lock, Pencil, Plus, Search, Trash2, UserPlus, X, Zap } from 'lucide-react';
 import { useHandover } from '../../context/HandoverContext';
 import { api, errorMessage } from '../../lib/api';
+import {
+  CERTIFICATIONS, ROLES, ROLE_TEMPLATES, certificationsFit, departmentOptions, joinCertifications, nextBadgeId, randomPin, splitCertifications,
+} from '../../data/userTemplates';
 import type { UserStaff } from '../../types';
+
+/** Marks "something else", which the administrator then types. */
+const OTHER = '__other__';
 
 type Status = NonNullable<UserStaff['status']>;
 
@@ -23,7 +29,11 @@ const field = 'mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2
 
 /** Administrator screen to create, read, update and delete staff accounts. The server checks every change. */
 export const UserManagement: React.FC = () => {
-  const { currentUser } = useHandover();
+  const { currentUser, departments } = useHandover();
+  const [showPin, setShowPin] = useState(false);
+  const [template, setTemplate] = useState('');
+  const [roleTyping, setRoleTyping] = useState(false);
+  const [departmentTyping, setDepartmentTyping] = useState(false);
   const [users, setUsers] = useState<UserStaff[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -58,6 +68,10 @@ export const UserManagement: React.FC = () => {
   }, [users, search]);
 
   const openNew = () => {
+    setShowPin(false);
+    setTemplate('');
+    setRoleTyping(false);
+    setDepartmentTyping(false);
     setForm(EMPTY_FORM);
     setFormError('');
     setEditing('new');
@@ -108,6 +122,33 @@ export const UserManagement: React.FC = () => {
   };
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((previous) => ({ ...previous, [key]: value }));
+
+  // The departments offered are the administrator's zones, or the standard warehouse areas until there are any.
+  const departmentChoices = departmentOptions(departments.map((zone) => zone.name));
+  const certificationItems = splitCertifications(form.qualification);
+  const extraCertifications = certificationItems.filter((item) => !CERTIFICATIONS.includes(item));
+  const roleChoice = form.role === '' && !roleTyping ? '' : ROLES.includes(form.role) && !roleTyping ? form.role : OTHER;
+  const departmentChoice = form.department === '' && !departmentTyping ? '' : departmentChoices.includes(form.department) && !departmentTyping ? form.department : OTHER;
+  const certificationsTooLong = !certificationsFit(certificationItems);
+
+  const applyTemplate = (id: string) => {
+    setTemplate(id);
+    const found = ROLE_TEMPLATES.find((entry) => entry.id === id);
+    if (!found) return;
+    setRoleTyping(false);
+    setDepartmentTyping(false);
+    setForm((previous) => ({
+      ...previous,
+      role: found.role,
+      department: departmentChoices.includes(found.department) ? found.department : previous.department,
+      qualification: joinCertifications(found.certifications),
+      isAdmin: Boolean(found.isAdmin),
+    }));
+  };
+  const toggleCertification = (name: string) => {
+    const next = certificationItems.includes(name) ? certificationItems.filter((item) => item !== name) : [...certificationItems, name];
+    set('qualification', joinCertifications(next));
+  };
 
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900">
@@ -187,15 +228,70 @@ export const UserManagement: React.FC = () => {
               <button type="button" onClick={close} aria-label="Close" className="rounded p-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"><X className="h-5 w-5" /></button>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
+              {editing === 'new' && (
+                <label className="sm:col-span-2 rounded-xl border border-teal-200 bg-teal-50 p-3 text-sm font-semibold text-slate-700 dark:text-slate-300 dark:border-teal-900 dark:bg-teal-950/30">
+                  <span className="flex items-center gap-1.5"><Zap className="h-4 w-4 text-teal-700 dark:text-teal-300" /> Quick start <span className="font-normal text-slate-600 dark:text-slate-300">(optional)</span></span>
+                  <select value={template} onChange={(event) => applyTemplate(event.target.value)} className={field}>
+                    <option value="">Choose a type of staff member…</option>
+                    {ROLE_TEMPLATES.map((entry) => <option key={entry.id} value={entry.id}>{entry.role}{entry.isAdmin ? ' (administrator)' : ''}</option>)}
+                  </select>
+                  <span className="mt-1 block text-xs font-normal text-slate-600 dark:text-slate-300">Fills the role, department and certifications. Change anything that is different.</span>
+                </label>
+              )}
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Full name *<input required maxLength={80} value={form.name} onChange={(event) => set('name', event.target.value)} className={field} /></label>
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Badge ID *<input required minLength={4} maxLength={40} value={form.staffNumber} onChange={(event) => set('staffNumber', event.target.value)} className={`${field} font-mono`} /></label>
+              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Badge ID *
+                <span className="flex gap-2">
+                  <input required minLength={4} maxLength={40} value={form.staffNumber} onChange={(event) => set('staffNumber', event.target.value)} className={`${field} font-mono`} />
+                  {editing === 'new' && (
+                    <button type="button" onClick={() => set('staffNumber', nextBadgeId(users.map((user) => user.staffNumber)))} className="mt-1 shrink-0 rounded-lg border border-slate-300 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800">Suggest</button>
+                  )}
+                </span>
+              </label>
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
                 {editing === 'new' ? 'PIN (4 to 6 digits) *' : 'New PIN (leave blank to keep)'}
-                <input required={editing === 'new'} type="password" inputMode="numeric" pattern="[0-9]{4,6}" maxLength={6} autoComplete="new-password" value={form.pin} onChange={(event) => set('pin', event.target.value)} className={`${field} font-mono tracking-widest`} />
+                <span className="flex gap-2">
+                  <input required={editing === 'new'} type={showPin ? 'text' : 'password'} inputMode="numeric" pattern="[0-9]{4,6}" maxLength={6} autoComplete="new-password" value={form.pin} onChange={(event) => set('pin', event.target.value)} className={`${field} font-mono tracking-widest`} />
+                  <button type="button" onClick={() => { set('pin', randomPin()); setShowPin(true); }} className="mt-1 inline-flex shrink-0 items-center gap-1 rounded-lg border border-slate-300 px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"><Dices className="h-3.5 w-3.5" /> Generate</button>
+                </span>
+                {showPin && form.pin && <span className="mt-1 block text-xs font-normal text-slate-600 dark:text-slate-300">Tell the worker this PIN. They can change it under Edit profile.</span>}
               </label>
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Role<input maxLength={80} value={form.role} onChange={(event) => set('role', event.target.value)} className={field} /></label>
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Department<input maxLength={80} value={form.department} onChange={(event) => set('department', event.target.value)} className={field} /></label>
-              <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Certifications<input maxLength={120} value={form.qualification} onChange={(event) => set('qualification', event.target.value)} className={field} /></label>
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <label>Role
+                  <select value={roleChoice} onChange={(event) => { if (event.target.value === OTHER) { setRoleTyping(true); set('role', ''); } else { setRoleTyping(false); set('role', event.target.value); } }} className={field}>
+                    <option value="">Choose a role…</option>
+                    {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+                    <option value={OTHER}>Other, I will type it</option>
+                  </select>
+                </label>
+                {roleChoice === OTHER && <input aria-label="Role" maxLength={80} value={form.role} onChange={(event) => set('role', event.target.value)} placeholder="Type the role" className={field} />}
+              </div>
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                <label>Department
+                  <select value={departmentChoice} onChange={(event) => { if (event.target.value === OTHER) { setDepartmentTyping(true); set('department', ''); } else { setDepartmentTyping(false); set('department', event.target.value); } }} className={field}>
+                    <option value="">Not set</option>
+                    {departmentChoices.map((name) => <option key={name} value={name}>{name}</option>)}
+                    <option value={OTHER}>Other, I will type it</option>
+                  </select>
+                </label>
+                {departmentChoice === OTHER && <input aria-label="Department" maxLength={80} value={form.department} onChange={(event) => set('department', event.target.value)} placeholder="Type the department" className={field} />}
+              </div>
+              <fieldset className="sm:col-span-2">
+                <legend className="text-sm font-semibold text-slate-700 dark:text-slate-300">Certifications</legend>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {CERTIFICATIONS.map((name) => {
+                    const on = certificationItems.includes(name);
+                    return (
+                      <label key={name} className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-medium ${on ? 'border-teal-600 bg-teal-50 text-teal-900 dark:bg-teal-950 dark:text-teal-200' : 'border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-300'}`}>
+                        <input type="checkbox" checked={on} onChange={() => toggleCertification(name)} className="sr-only" />
+                        {on ? '✓ ' : ''}{name}
+                      </label>
+                    );
+                  })}
+                </div>
+                <input aria-label="Other certifications" value={extraCertifications.join(', ')} onChange={(event) => set('qualification', joinCertifications([...certificationItems.filter((item) => CERTIFICATIONS.includes(item)), ...splitCertifications(event.target.value)]))} placeholder="Other certifications, separated by commas" className={field} />
+                {certificationsTooLong && <span role="alert" className="mt-1 block text-xs font-medium text-rose-700">That is too many to save (120 characters at most). Remove one.</span>}
+              </fieldset>
               <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Status
                 <select value={form.status} onChange={(event) => set('status', event.target.value as Status)} className={field}>
                   {(Object.keys(STATUS_LABELS) as Status[]).map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}

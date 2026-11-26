@@ -1,11 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import { FlaskConical } from 'lucide-react';
+import React, { useState } from 'react';
 import { useHandover } from '../../context/HandoverContext';
-import { createStatisticsSnapshot, demoStatistics } from '../../lib/statisticsSnapshot';
+import { demoStatistics } from '../../lib/statisticsSnapshot';
 import { ForecastPanel } from './ForecastPanel';
 import { BarList, ChartCard, ChartDatum, ColumnChart, StatTile } from './Charts';
-
-const DEMO_DATA_KEY = 'zamu_statistics_demo_data_v7';
 
 const STATUS_LABELS: Record<string, string> = {
   in_progress: 'In progress',
@@ -41,27 +38,10 @@ const SECTIONS: { id: SectionId; label: string }[] = [
 ];
 
 export const StatisticsAnalyticsView: React.FC = () => {
-  const { archive, activeHandover, attendanceLogs, complianceRecords, tasks } = useHandover();
+  const { complianceRecords } = useHandover();
 
   const [view, setView] = useState<'overview' | 'records'>('overview');
   const [hidden, setHidden] = useState<Set<SectionId>>(new Set());
-  const [useDemoData, setUseDemoData] = useState(() => {
-    try {
-      return localStorage.getItem(DEMO_DATA_KEY) === 'on';
-    } catch {
-      return false;
-    }
-  });
-
-  const chooseDataSource = (demo: boolean) => {
-    setUseDemoData(demo);
-    try {
-      localStorage.setItem(DEMO_DATA_KEY, demo ? 'on' : 'off');
-    } catch {
-      // The choice simply will not be remembered.
-    }
-  };
-
   const toggleSection = (id: SectionId) => {
     setHidden((current) => {
       const next = new Set(current);
@@ -71,12 +51,8 @@ export const StatisticsAnalyticsView: React.FC = () => {
     });
   };
 
-  const appStatistics = useMemo(
-    () => createStatisticsSnapshot({ activeHandover, archive, tasks, attendanceLogs, complianceRecords }),
-    [activeHandover, archive, tasks, attendanceLogs, complianceRecords]
-  );
-  // Every number, chart and assistant answer on this page comes from this one object.
-  const stats = useDemoData ? demoStatistics : appStatistics;
+  // The figures, charts and forecast on this page are the generated demonstration set.
+  const stats = demoStatistics;
 
   const monthly: ChartDatum[] = Object.keys(stats.handoversByMonth).sort().map((month) => {
     const date = new Date(`${month}-01T00:00:00`);
@@ -109,14 +85,6 @@ export const StatisticsAnalyticsView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div role="group" aria-label="Data source" className="flex gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
-            <button type="button" aria-pressed={!useDemoData} onClick={() => chooseDataSource(false)} className={segment(!useDemoData)}>
-              Live data
-            </button>
-            <button type="button" aria-pressed={useDemoData} onClick={() => chooseDataSource(true)} className={`${segment(useDemoData)} inline-flex items-center gap-1.5`}>
-              <FlaskConical className="h-4 w-4" /> Demo data
-            </button>
-          </div>
           <div role="tablist" aria-label="View" className="flex gap-1 rounded-xl bg-slate-200/70 p-1 dark:bg-slate-800">
             <button type="button" role="tab" aria-selected={view === 'overview'} onClick={() => setView('overview')} className={segment(view === 'overview')}>
               Overview
@@ -127,17 +95,6 @@ export const StatisticsAnalyticsView: React.FC = () => {
           </div>
         </div>
       </header>
-
-      {useDemoData && (
-        <p role="status" className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-          <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-          <span>
-            <span className="font-bold">Demo data is on. </span>
-            These figures are {stats.handoverCount.toLocaleString()} generated handovers covering the past year, for testing and presentations.
-            They are not real records and nothing is saved to the database.
-          </span>
-        </p>
-      )}
 
       {view === 'overview' ? (
         <>
@@ -190,7 +147,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {show('forecast') && (
               <div className="lg:col-span-2">
-                <ForecastPanel showingDemoData={useDemoData} />
+                <ForecastPanel showingDemoData />
               </div>
             )}
             {show('trend') && (
@@ -234,11 +191,7 @@ export const StatisticsAnalyticsView: React.FC = () => {
             <h2 className="text-lg font-bold text-slate-900 dark:text-white">Sign-off records</h2>
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Handovers signed by both the outgoing and the incoming staff member.</p>
           </div>
-          {useDemoData ? (
-            <p className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">
-              Demo data only generates totals, so there are no individual records to list. Switch to live data to see them.
-            </p>
-          ) : complianceRecords.length === 0 ? (
+          {complianceRecords.length === 0 ? (
             <p className="p-8 text-center text-sm text-slate-500 dark:text-slate-400">No handover has been signed by both staff members yet.</p>
           ) : (
             <div className="overflow-x-auto">

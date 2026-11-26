@@ -87,9 +87,10 @@ Settings (all in `.env`, never committed):
 ## Statistics and demo data
 
 The Statistics screen shows headline figures and charts, and each section can be
-switched on or off. A **Live data / Demo data** switch replaces every figure
-with a generated year of handovers for testing and presentations. Demo data is
-labelled on screen and is never written to the database.
+switched on or off. For now every figure, chart and the forecast come from a
+generated year of handovers made for testing and presentations, because no real
+operational records exist. They are never written to the database. The
+Sign-off records tab lists the handovers that were really signed by two people.
 
 ## Workload forecast
 
