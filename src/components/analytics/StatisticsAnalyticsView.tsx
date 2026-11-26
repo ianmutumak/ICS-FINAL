@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useHandover } from '../../context/HandoverContext';
-import { demoStatistics } from '../../lib/statisticsSnapshot';
+import { createStatisticsSnapshot } from '../../lib/statisticsSnapshot';
 import { ForecastPanel } from './ForecastPanel';
 import { BarList, ChartCard, ChartDatum, ColumnChart, StatTile } from './Charts';
 
@@ -38,7 +38,7 @@ const SECTIONS: { id: SectionId; label: string }[] = [
 ];
 
 export const StatisticsAnalyticsView: React.FC = () => {
-  const { complianceRecords } = useHandover();
+  const { archive, activeHandover, attendanceLogs, complianceRecords, tasks } = useHandover();
 
   const [view, setView] = useState<'overview' | 'records'>('overview');
   const [hidden, setHidden] = useState<Set<SectionId>>(new Set());
@@ -51,8 +51,11 @@ export const StatisticsAnalyticsView: React.FC = () => {
     });
   };
 
-  // The figures, charts and forecast on this page are the generated demonstration set.
-  const stats = demoStatistics;
+  // Every figure and chart on this page is worked out from the handovers that were really recorded.
+  const stats = useMemo(
+    () => createStatisticsSnapshot({ activeHandover, archive, tasks, attendanceLogs, complianceRecords }),
+    [activeHandover, archive, tasks, attendanceLogs, complianceRecords],
+  );
 
   const monthly: ChartDatum[] = Object.keys(stats.handoversByMonth).sort().map((month) => {
     const date = new Date(`${month}-01T00:00:00`);
